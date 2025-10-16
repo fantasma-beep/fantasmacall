@@ -179,7 +179,6 @@
             conn.on('open', () => {
                 dataConnections[conn.peer] = conn;
                 conn.send({ type: 'user-info', peerId: peer.id, name: myName });
-                broadcastData({ type: 'new-peer-announcement', peerId: conn.peer });
             });
         };
 
@@ -197,6 +196,8 @@
                 case 'user-info':
                     participants[data.peerId] = { name: data.name };
                     updateParticipantName(data.peerId, data.name);
+                    // ---> FIX: Notificar a otros sobre este nuevo usuario
+                    broadcastData({ type: 'new-peer-announcement', peerId: data.peerId }, fromId);
                     break;
                 case 'new-peer-announcement':
                     if (!calls[data.peerId] && data.peerId !== peer.id) {
@@ -219,7 +220,7 @@
                 await setupLocalMedia();
 
                 // ---> FIX: Usando un servidor PeerJS público y robusto
-                peer = new Peer({
+                peer = new Peer(undefined, {
                     host: 'peerjs.92k.de',
                     secure: true,
                     port: 443,
@@ -301,8 +302,12 @@
             call.on('close', () => removeParticipant(friendId));
         };
         
-        const broadcastData = (data) => {
-             Object.values(dataConnections).forEach(conn => conn.send(data));
+        const broadcastData = (data, excludeId = null) => {
+             Object.values(dataConnections).forEach(conn => {
+                if (conn.peer !== excludeId) {
+                    conn.send(data);
+                }
+             });
         }
 
         const displayMessage = (fromName, message, isSent) => {
@@ -368,7 +373,7 @@
             if (id === 'local' && videoDevices.length > 1) {
                 const switchCamBtn = document.createElement('div');
                 switchCamBtn.className = 'video-overlay-button switch-camera-btn';
-                switchCamBtn.innerHTML = `<svg class="w-5 h-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h5M20 20v-5h-5m-5 5h5v-5M4 9V4h5" /></svg>`;
+                switchCamBtn.innerHTML = `<svg class="w-6 h-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h5M20 20v-5h-5m-5 5h5v-5M4 9V4h5" /></svg>`;
                 switchCamBtn.onclick = (e) => {
                     e.stopPropagation();
                     switchCamera();
@@ -380,6 +385,11 @@
         };
         
         const setupLocalMedia = async (deviceId = undefined) => {
+            // Detener tracks antiguos si existen
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+            }
+            
             const constraints = {
                 video: { deviceId: deviceId ? { exact: deviceId } : undefined },
                 audio: true,
@@ -396,8 +406,6 @@
             if (videoDevices.length < 2) return;
             currentCameraIndex = (currentCameraIndex + 1) % videoDevices.length;
             const nextCameraId = videoDevices[currentCameraIndex].deviceId;
-
-            localStream.getTracks().forEach(track => track.stop());
 
             await setupLocalMedia(nextCameraId);
             
