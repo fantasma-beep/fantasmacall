@@ -145,7 +145,6 @@
         const calls = {};
         const dataConnections = {};
         let myName = `Fantasma-${Math.floor(Math.random() * 1000)}`;
-        // ---> FIX: Objeto para guardar info de participantes
         const participants = {};
 
         // --- Lógica de Conexión (PeerJS) ---
@@ -155,13 +154,9 @@
             conn.on('data', (data) => handleData(peerId, data));
             conn.on('close', () => removeParticipant(peerId));
             conn.on('open', () => {
-                // ---> FIX: Lógica de conexión simplificada y robusta
-                // 1. Enviar nuestra info al nuevo peer.
                 conn.send({ type: 'user-info', peerId: peer.id, name: myName });
-
-                // 2. Notificar a los demás sobre el nuevo peer.
                 Object.values(dataConnections).forEach(existingConn => {
-                    if (existingConn.peer !== peerId) { // No te notifiques a ti mismo
+                    if (existingConn.peer !== peerId) { 
                         existingConn.send({ type: 'user-connected', peerId: peerId, name: participants[peerId]?.name || 'Nuevo Usuario' });
                     }
                 });
@@ -173,7 +168,6 @@
                 case 'chat':
                     displayMessage(data.fromName, data.message, false);
                     break;
-                // ---> FIX: Recibir info del usuario y actualizar
                 case 'user-info':
                 case 'user-connected':
                     participants[data.peerId] = { name: data.name };
@@ -215,7 +209,10 @@
                     callBtn.classList.add('bg-green-600', 'hover:bg-green-700');
                 });
 
+                // ---> FIX: MOSTRAR PANTALLA DE LLAMADA AL RECIBIR UNA
                 peer.on('call', (call) => {
+                    showCallScreen(); // <--- LA CORRECCIÓN CLAVE
+                    
                     call.answer(localStream);
                     const peerId = call.peer;
                     calls[peerId] = call;
@@ -242,8 +239,8 @@
 
         const makeCall = (friendId, friendName = `Amigo`) => {
             if (!friendId || calls[friendId] || friendId === peer.id) return;
-            console.log(`Realizando llamada a ${friendId}`);
-
+            showCallScreen();
+            
             const conn = peer.connect(friendId, { reliable: true });
             setupDataConnection(conn);
             
@@ -254,8 +251,6 @@
                 addVideoStream(friendId, friendName, remoteStream);
             });
             call.on('close', () => removeParticipant(friendId));
-            
-            showCallScreen();
         };
         
         const displayMessage = (fromName, message, isSent) => {
@@ -309,7 +304,6 @@
             videoGrid.appendChild(container);
         };
 
-        // ---> FIX: Función dedicada para actualizar el nombre
         const updateParticipantName = (peerId, name) => {
             const nameTag = document.querySelector(`#container-${peerId} .participant-name`);
             if (nameTag) {
@@ -345,7 +339,6 @@
         const showConnectionScreen = () => {
             callScreen.classList.add('hidden');
             connectionScreen.classList.remove('hidden');
-            // Limpiar solo videos remotos
             Array.from(videoGrid.children).forEach(child => {
                 if(child.id !== `container-${peer.id}`) {
                     child.remove();
