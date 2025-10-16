@@ -145,6 +145,8 @@
         const calls = {};
         const dataConnections = {};
         let myName = `Fantasma-${Math.floor(Math.random() * 1000)}`;
+        // ---> FIX: Objeto para guardar info de participantes
+        const participants = {};
 
         // --- Lógica de Conexión (PeerJS) ---
         const setupDataConnection = (conn) => {
@@ -153,13 +155,16 @@
             conn.on('data', (data) => handleData(peerId, data));
             conn.on('close', () => removeParticipant(peerId));
             conn.on('open', () => {
-                Object.values(dataConnections).forEach(c => {
-                    if (c.peer !== peerId) {
-                        c.send({ type: 'user-connected', peerId: peerId, name: 'Nuevo Usuario' });
+                // ---> FIX: Lógica de conexión simplificada y robusta
+                // 1. Enviar nuestra info al nuevo peer.
+                conn.send({ type: 'user-info', peerId: peer.id, name: myName });
+
+                // 2. Notificar a los demás sobre el nuevo peer.
+                Object.values(dataConnections).forEach(existingConn => {
+                    if (existingConn.peer !== peerId) { // No te notifiques a ti mismo
+                        existingConn.send({ type: 'user-connected', peerId: peerId, name: participants[peerId]?.name || 'Nuevo Usuario' });
                     }
-                    conn.send({ type: 'user-connected', peerId: c.peer, name: myName }); // Envía info de los existentes al nuevo
                 });
-                 conn.send({ type: 'user-connected', peerId: peer.id, name: myName });
             });
         };
 
@@ -168,25 +173,25 @@
                 case 'chat':
                     displayMessage(data.fromName, data.message, false);
                     break;
+                // ---> FIX: Recibir info del usuario y actualizar
+                case 'user-info':
                 case 'user-connected':
+                    participants[data.peerId] = { name: data.name };
+                    updateParticipantName(data.peerId, data.name);
+                    
                     if (!calls[data.peerId] && data.peerId !== peer.id) {
                         console.log(`Notificado del nuevo usuario ${data.name} (${data.peerId}). Llamando.`);
                         makeCall(data.peerId, data.name);
-                    }
-                    const nameTag = document.querySelector(`#container-${data.peerId} .participant-name`);
-                    if (nameTag && nameTag.textContent !== data.name) {
-                        nameTag.textContent = data.name;
                     }
                     break;
             }
         };
 
         const initializePeer = async () => {
-            // ---> FIX: Deshabilitar controles hasta que PeerJS esté listo
             friendIdInput.disabled = true;
             callBtn.disabled = true;
             callBtn.textContent = 'Conectando...';
-            callBtn.classList.add('bg-gray-500', 'hover:bg-gray-500', 'cursor-not-allowed');
+            callBtn.classList.add('bg-gray-500', 'hover:bg-gray-500');
             callBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
 
             try {
@@ -199,14 +204,14 @@
                 peer = new Peer();
                 peer.on('open', (id) => {
                     myIdSpan.textContent = id;
+                    participants[id] = { name: myName };
                     const localVideoContainer = document.getElementById('container-local');
                     if (localVideoContainer) localVideoContainer.id = `container-${id}`;
                     
-                    // ---> FIX: Habilitar controles ahora que PeerJS está listo
                     friendIdInput.disabled = false;
                     callBtn.disabled = false;
                     callBtn.textContent = 'Unirse';
-                    callBtn.classList.remove('bg-gray-500', 'hover:bg-gray-500', 'cursor-not-allowed');
+                    callBtn.classList.remove('bg-gray-500', 'hover:bg-gray-500');
                     callBtn.classList.add('bg-green-600', 'hover:bg-green-700');
                 });
 
@@ -215,7 +220,8 @@
                     const peerId = call.peer;
                     calls[peerId] = call;
                     call.on('stream', (remoteStream) => {
-                        addVideoStream(peerId, `Conectando...`, remoteStream);
+                        const peerName = participants[peerId]?.name || 'Conectando...';
+                        addVideoStream(peerId, peerName, remoteStream);
                     });
                     call.on('close', () => removeParticipant(peerId));
                 });
@@ -281,16 +287,17 @@
         };
 
         const addVideoStream = (id, name, stream, isMuted = false) => {
-            if (document.getElementById(`container-${id}`)) {
-                const nameTag = document.querySelector(`#container-${id} .participant-name`);
-                if(nameTag) nameTag.textContent = name;
-                return;
-            }
+            if (document.getElementById(`container-${id}`)) return;
             const container = document.createElement('div');
             container.id = `container-${id}`;
             container.className = 'video-container aspect-video';
             const video = document.createElement('video');
             video.srcObject = stream;
+            
+            video.addEventListener('loadedmetadata', () => {
+                video.play().catch(e => console.error("Error al reproducir el video:", e));
+            });
+
             video.autoplay = true;
             video.playsInline = true;
             video.muted = isMuted;
@@ -301,6 +308,14 @@
             container.appendChild(nameTag);
             videoGrid.appendChild(container);
         };
+
+        // ---> FIX: Función dedicada para actualizar el nombre
+        const updateParticipantName = (peerId, name) => {
+            const nameTag = document.querySelector(`#container-${peerId} .participant-name`);
+            if (nameTag) {
+                nameTag.textContent = name;
+            }
+        };
         
         const removeParticipant = (peerId) => {
             console.log(`Eliminando participante: ${peerId}`);
@@ -308,6 +323,7 @@
             if (container) container.remove();
             if (calls[peerId]) delete calls[peerId];
             if (dataConnections[peerId]) delete dataConnections[peerId];
+            if (participants[peerId]) delete participants[peerId];
         };
 
         const endCall = () => {
@@ -315,6 +331,9 @@
             Object.values(dataConnections).forEach(conn => conn.close());
             for (const key in calls) delete calls[key];
             for (const key in dataConnections) delete dataConnections[key];
+            for (const key in participants) {
+                if(key !== peer.id) delete participants[key];
+            }
             showConnectionScreen();
         };
         
@@ -326,12 +345,14 @@
         const showConnectionScreen = () => {
             callScreen.classList.add('hidden');
             connectionScreen.classList.remove('hidden');
-            videoGrid.innerHTML = '';
+            // Limpiar solo videos remotos
+            Array.from(videoGrid.children).forEach(child => {
+                if(child.id !== `container-${peer.id}`) {
+                    child.remove();
+                }
+            });
             friendIdInput.value = '';
             messagesDiv.innerHTML = '';
-            if (localStream) {
-                addVideoStream(peer ? peer.id : 'local', myName, localStream, true);
-            }
         };
 
         copyIdBtn.addEventListener('click', () => {
@@ -344,7 +365,7 @@
         chatForm.addEventListener('submit', sendMessage);
         chatBtn.addEventListener('click', () => {
             chatPanel.classList.toggle('hidden');
-            chatPanel.classList.toggle('flex'); // Asegura que se muestre como flex
+            chatPanel.classList.toggle('flex');
         });
 
         muteBtn.addEventListener('click', () => {
