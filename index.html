@@ -10,11 +10,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <!--
-      Icono de la App desde un enlace.
-      REEMPLAZA la URL de abajo con el enlace a tu logo.
+      Icono de la App.
+      Asegúrate de tener un archivo llamado 'LOGOFONDO.png' en tu repositorio.
     -->
-    <link rel="icon" href="https://i.ibb.co/9vR9zM8/logo-fantasma-fondo.png" type="image/png">
-    <link rel="apple-touch-icon" href="https://i.ibb.co/9vR9zM8/logo-fantasma-fondo.png">
+    <link rel="icon" href="LOGOFONDO.png" type="image/png">
+    <link rel="apple-touch-icon" href="LOGOFONDO.png">
     <meta name="theme-color" content="#202124">
 
     <style>
@@ -201,7 +201,6 @@
             }
         };
 
-        // ---> NUEVO: Función para manejar errores de conexión de forma centralizada
         const handleConnectionError = (message) => {
             myIdSpan.textContent = "Error de conexión";
             myIdSpan.classList.add('text-red-400');
@@ -212,7 +211,7 @@
             callBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
             callBtn.classList.add('bg-yellow-600', 'hover:bg-yellow-700');
             callBtn.onclick = () => window.location.reload();
-            console.error(message); // Mantenemos el log para depuración
+            console.error(message);
         };
 
         const initializePeer = async () => {
@@ -229,15 +228,19 @@
                 localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                 addVideoStream('local', myName, localStream, true);
 
-                peer = new Peer();
+                // ---> FIX: Usando un servidor PeerJS público y robusto
+                peer = new Peer(undefined, {
+                    host: 'peerjs.92k.de',
+                    secure: true,
+                    port: 443,
+                });
 
-                // ---> NUEVO: Timeout para detectar si la conexión al servidor de PeerJS falla
                 const connectionTimeout = setTimeout(() => {
                     handleConnectionError("No se pudo conectar al servidor de llamadas. Revisa tu conexión e inténtalo de nuevo.");
-                }, 10000); // 10 segundos
+                }, 10000);
 
                 peer.on('open', (id) => {
-                    clearTimeout(connectionTimeout); // Se conectó exitosamente
+                    clearTimeout(connectionTimeout);
                     myIdSpan.textContent = id;
                     participants[id] = { name: myName };
                     const localVideoContainer = document.getElementById('container-local');
