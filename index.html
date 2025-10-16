@@ -9,9 +9,12 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     
-    <!-- NUEVO: Iconos para la app y el navegador -->
-    <link rel="icon" href="LOGOFONDO.png" type="image/png">
-    <link rel="apple-touch-icon" href="LOGOFONDO.png">
+    <!--
+      NUEVO: Icono de la App desde un enlace.
+      REEMPLAZA la URL de abajo con el enlace a tu logo.
+    -->
+    <link rel="icon" href="https://i.ibb.co/9vR9zM8/logo-fantasma-fondo.png" type="image/png">
+    <link rel="apple-touch-icon" href="https://i.ibb.co/9vR9zM8/logo-fantasma-fondo.png">
     <meta name="theme-color" content="#202124">
 
     <style>
@@ -32,51 +35,39 @@
         .video-container {
             position: relative; overflow: hidden; border-radius: 12px; background-color: #2D2E30;
             transition: all 0.3s ease-in-out;
-            cursor: pointer;
         }
         .video-container video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
         .participant-name {
             position: absolute; bottom: 8px; left: 8px; background-color: rgba(0, 0, 0, 0.5);
-            color: white; padding: 4px 8px; border-radius: 6px; font-size: 14px;
+            color: white; padding: 4px 8px; border-radius: 6px; font-size: 14px; z-index: 2;
         }
-        .chat-message {
-            padding: 8px 12px;
-            border-radius: 18px;
-            margin-bottom: 8px;
-            max-width: 80%;
-        }
-        .chat-message.sent {
-            background-color: #3B82F6;
-            align-self: flex-end;
-            color: white;
-        }
-        .chat-message.received {
-            background-color: #4A4A4A;
-            align-self: flex-start;
-        }
-        button:disabled {
-            cursor: not-allowed;
-        }
+        .chat-message { padding: 8px 12px; border-radius: 18px; margin-bottom: 8px; max-width: 80%; }
+        .chat-message.sent { background-color: #3B82F6; align-self: flex-end; color: white; }
+        .chat-message.received { background-color: #4A4A4A; align-self: flex-start; }
+        button:disabled { cursor: not-allowed; }
         #video-grid-container {
             background-image: url('LOGOFONDO.png');
             background-repeat: repeat;
             background-size: 150px; 
             background-color: #202124;
         }
-        #video-grid-container.fullscreen-mode {
-            background-image: none;
-        }
-        #video-grid-container.fullscreen-mode .video-container:not(.fullscreen) {
-            display: none;
-        }
+        #video-grid-container.fullscreen-mode { background-image: none; }
+        #video-grid-container.fullscreen-mode .video-container:not(.fullscreen) { display: none; }
         .video-container.fullscreen {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            border-radius: 0;
-            z-index: 10;
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 0; z-index: 20;
+        }
+        /* --- NUEVO: Estilos para el botón de pantalla completa --- */
+        .fullscreen-btn {
+            position: absolute; top: 8px; right: 8px;
+            background-color: rgba(0, 0, 0, 0.5);
+            border-radius: 50%;
+            padding: 6px;
+            cursor: pointer;
+            z-index: 3;
+            transition: transform 0.2s;
+        }
+        .fullscreen-btn:hover {
+            transform: scale(1.1);
         }
     </style>
 </head>
@@ -93,7 +84,6 @@
                 <svg class="w-5 h-5" fill="white" viewBox="0 0 20 20"><path d="M7 3a1 1 0 011-1h5a1 1 0 011 1v2h1.5a1.5 1.5 0 011.5 1.5v9a1.5 1.5 0 01-1.5 1.5h-9A1.5 1.5 0 013 15.5v-9A1.5 1.5 0 014.5 5H6V3a1 1 0 011-1zM6 5v1h8V5h-1v1a1 1 0 01-1 1H8a1 1 0 01-1-1V5H6z"></path></svg>
             </button>
         </div>
-
         <p class="text-lg text-gray-300 mb-4">Ingresa el ID de alguien en la llamada para unirte:</p>
         <div class="flex justify-center">
             <input type="text" id="friend-id" placeholder="ID de un participante..." class="w-64 px-4 py-2 rounded-l-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -104,19 +94,16 @@
     <!-- Pantalla de la Llamada -->
     <div id="call-screen" class="hidden w-full h-full flex flex-col">
         <div class="flex-1 flex flex-col sm:flex-row overflow-hidden">
-            <main class="flex-1 p-2 sm:p-4" id="video-grid-container">
-                 <div id="video-grid" class="w-full h-full grid grid-cols-1 md:grid-cols-2 gap-4">
+            <main class="flex-1 p-2 sm:p-4 relative" id="video-grid-container">
+                 <div id="video-grid" class="w-full h-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     <!-- Los videos se agregarán aquí -->
                  </div>
             </main>
-            <!-- Panel de Chat -->
             <aside id="chat-panel" class="w-full sm:w-80 bg-gray-800 flex-col h-full border-l border-gray-700 hidden">
                 <div class="p-4 border-b border-gray-700">
                     <h2 class="text-lg font-semibold">Chat</h2>
                 </div>
-                <div id="messages" class="flex-1 p-4 overflow-y-auto flex flex-col">
-                    <!-- Los mensajes se agregarán aquí -->
-                </div>
+                <div id="messages" class="flex-1 p-4 overflow-y-auto flex flex-col"></div>
                 <div class="p-4 border-t border-gray-700">
                     <form id="chat-form" class="flex">
                         <input type="text" id="chat-input" placeholder="Escribe..." autocomplete="off" class="flex-1 px-3 py-2 rounded-l-lg bg-gray-700 border border-gray-600 focus:outline-none">
@@ -148,13 +135,10 @@
         </footer>
     </div>
 
-    <!-- NUEVO: Modal de llamada entrante -->
     <div id="incoming-call-modal" class="hidden fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
         <div class="bg-gray-800 p-8 rounded-2xl text-center shadow-lg">
             <h2 class="text-2xl font-bold mb-2">Llamada Entrante</h2>
-            <p class="text-lg mb-6">
-                <span id="caller-name" class="font-semibold">Alguien</span> te está llamando.
-            </p>
+            <p class="text-lg mb-6"><span id="caller-name" class="font-semibold">Alguien</span> te está llamando.</p>
             <div class="flex justify-center space-x-4">
                 <button id="decline-call-btn" class="px-8 py-3 bg-red-600 text-white font-bold rounded-full hover:bg-red-700 transition">Rechazar</button>
                 <button id="accept-call-btn" class="px-8 py-3 bg-green-600 text-white font-bold rounded-full hover:bg-green-700 transition">Contestar</button>
@@ -180,7 +164,6 @@
         const messagesDiv = document.getElementById('messages');
         const chatForm = document.getElementById('chat-form');
         const chatInput = document.getElementById('chat-input');
-        // --- NUEVO: Referencias al modal de llamada ---
         const incomingCallModal = document.getElementById('incoming-call-modal');
         const callerNameSpan = document.getElementById('caller-name');
         const acceptCallBtn = document.getElementById('accept-call-btn');
@@ -204,11 +187,6 @@
             conn.on('close', () => removeParticipant(peerId));
             conn.on('open', () => {
                 conn.send({ type: 'user-info', peerId: peer.id, name: myName });
-                Object.values(dataConnections).forEach(existingConn => {
-                    if (existingConn.peer !== peerId) { 
-                        existingConn.send({ type: 'user-connected', peerId: peerId, name: participants[peerId]?.name || 'Nuevo Usuario' });
-                    }
-                });
             });
         };
 
@@ -218,13 +196,8 @@
                     displayMessage(data.fromName, data.message, false);
                     break;
                 case 'user-info':
-                case 'user-connected':
                     participants[data.peerId] = { name: data.name };
                     updateParticipantName(data.peerId, data.name);
-                    
-                    if (!calls[data.peerId] && data.peerId !== peer.id) {
-                        makeCall(data.peerId, data.name);
-                    }
                     break;
             }
         };
@@ -257,47 +230,54 @@
                     callBtn.classList.add('bg-green-600', 'hover:bg-green-700');
                 });
 
-                // --- MODIFICADO: Manejo de llamada entrante ---
                 peer.on('call', (call) => {
                     const callerId = call.peer;
-                    const callerName = participants[callerId]?.name || 'Alguien';
-                    
-                    callerNameSpan.textContent = callerName;
-                    incomingCallModal.classList.remove('hidden');
+                    // Esperamos recibir la info del usuario para mostrar el nombre correcto
+                    const checkCallerInfo = setInterval(() => {
+                        if (participants[callerId]) {
+                            clearInterval(checkCallerInfo);
+                            callerNameSpan.textContent = participants[callerId].name;
+                            incomingCallModal.classList.remove('hidden');
 
-                    acceptCallBtn.onclick = () => {
-                        incomingCallModal.classList.add('hidden');
-                        showCallScreen(); 
-                        
-                        call.answer(localStream);
-                        calls[callerId] = call;
-                        call.on('stream', (remoteStream) => {
-                            addVideoStream(callerId, callerName, remoteStream);
-                        });
-                        call.on('close', () => removeParticipant(callerId));
-                    };
+                            acceptCallBtn.onclick = () => {
+                                incomingCallModal.classList.add('hidden');
+                                showCallScreen();
+                                answerCall(call);
+                            };
 
-                    declineCallBtn.onclick = () => {
-                        incomingCallModal.classList.add('hidden');
-                        // No hacemos nada con la 'call', se cerrará por timeout del otro lado.
-                    };
+                            declineCallBtn.onclick = () => {
+                                incomingCallModal.classList.add('hidden');
+                                // PeerJS no tiene un método `reject`, simplemente no contestamos.
+                            };
+                        }
+                    }, 100);
                 });
 
-                peer.on('connection', (conn) => {
-                    setupDataConnection(conn);
-                });
+                peer.on('connection', (conn) => setupDataConnection(conn));
+                peer.on('error', (err) => console.error('Error de PeerJS:', err));
 
-                peer.on('error', (err) => {
-                    console.error('Error de PeerJS:', err);
-                    alert('Hubo un error de conexión. Por favor, recarga la página.');
-                });
             } catch (error) {
-                console.error("Error al acceder a la cámara/micrófono:", error);
                 alert("No se pudo acceder a tu cámara y micrófono. Revisa los permisos.");
             }
         };
+        
+        const answerCall = (call) => {
+            const callerId = call.peer;
+            call.answer(localStream);
+            calls[callerId] = call;
+            call.on('stream', (remoteStream) => {
+                addVideoStream(callerId, participants[callerId]?.name || 'Usuario', remoteStream);
+            });
+            call.on('close', () => removeParticipant(callerId));
 
-        const makeCall = (friendId, friendName = `Amigo`) => {
+            // Conectar canal de datos si no existe
+            if (!dataConnections[callerId]) {
+                const conn = peer.connect(callerId, { reliable: true });
+                setupDataConnection(conn);
+            }
+        };
+
+        const makeCall = (friendId) => {
             if (!friendId || calls[friendId] || friendId === peer.id) return;
             showCallScreen();
             
@@ -308,7 +288,7 @@
             calls[friendId] = call;
 
             call.on('stream', (remoteStream) => {
-                addVideoStream(friendId, friendName, remoteStream);
+                addVideoStream(friendId, 'Conectando...', remoteStream);
             });
             call.on('close', () => removeParticipant(friendId));
         };
@@ -317,16 +297,13 @@
             const messageEl = document.createElement('div');
             messageEl.textContent = message;
             messageEl.className = isSent ? 'chat-message sent' : 'chat-message received';
-            
             const senderEl = document.createElement('div');
             senderEl.className = 'text-xs text-gray-400 mb-1';
             senderEl.textContent = isSent ? 'Tú' : fromName;
-
             const container = document.createElement('div');
             container.className = `w-full flex flex-col ${isSent ? 'items-end' : 'items-start'}`;
             container.appendChild(senderEl);
             container.appendChild(messageEl);
-
             messagesDiv.appendChild(container);
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
         };
@@ -357,33 +334,42 @@
             video.playsInline = true;
             video.muted = isMuted;
             container.appendChild(video);
+            
             const nameTag = document.createElement('div');
             nameTag.className = 'participant-name';
             nameTag.textContent = name;
             container.appendChild(nameTag);
             
-            container.addEventListener('click', () => toggleFullscreen(container));
+            const fullscreenBtn = document.createElement('div');
+            fullscreenBtn.className = 'fullscreen-btn';
+            fullscreenBtn.innerHTML = `<svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 0h-4m4 0l-5-5"></path></svg>`;
+            fullscreenBtn.onclick = (e) => {
+                e.stopPropagation(); // Evita que se dispare el evento del contenedor
+                toggleFullscreen(container);
+            };
+            container.appendChild(fullscreenBtn);
             
             videoGrid.appendChild(container);
         };
         
         const toggleFullscreen = (container) => {
             const isFullscreen = container.classList.contains('fullscreen');
-            
-            const currentFullscreen = document.querySelector('.fullscreen');
-            if (currentFullscreen && currentFullscreen !== container) {
-                currentFullscreen.classList.remove('fullscreen');
-            }
+            const btn = container.querySelector('.fullscreen-btn');
 
-            container.classList.toggle('fullscreen');
-            videoGridContainer.classList.toggle('fullscreen-mode');
+            document.querySelector('.fullscreen')?.classList.remove('fullscreen');
+            
+            if (!isFullscreen) {
+                container.classList.add('fullscreen');
+                btn.innerHTML = `<svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l-5 5m0 0V15m0 4h4m11-5l-5 5m0 0V15m0 4h-4M14 10l5-5m0 0V9m0-4h-4M5 9l5-5m0 0V9m0-4H9"></path></svg>`;
+            } else {
+                 btn.innerHTML = `<svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 0h-4m4 0l-5-5"></path></svg>`;
+            }
+            videoGridContainer.classList.toggle('fullscreen-mode', !isFullscreen);
         };
 
         const updateParticipantName = (peerId, name) => {
             const nameTag = document.querySelector(`#container-${peerId} .participant-name`);
-            if (nameTag) {
-                nameTag.textContent = name;
-            }
+            if (nameTag) nameTag.textContent = name;
         };
         
         const removeParticipant = (peerId) => {
@@ -396,7 +382,6 @@
 
         const endCall = () => {
             Object.values(calls).forEach(call => call.close());
-            Object.values(dataConnections).forEach(conn => conn.close());
             for (const key in calls) delete calls[key];
             for (const key in dataConnections) delete dataConnections[key];
             for (const key in participants) {
@@ -413,7 +398,6 @@
         const showConnectionScreen = () => {
             callScreen.style.display = 'none';
             connectionScreen.style.display = 'block';
-            
             Array.from(videoGrid.children).forEach(child => {
                 if(child.id !== `container-${peer.id}`) {
                     child.remove();
@@ -424,9 +408,7 @@
         };
 
         copyIdBtn.addEventListener('click', () => {
-            navigator.clipboard.writeText(myIdSpan.textContent).then(() => {
-                alert('¡ID copiado al portapapeles!');
-            });
+            navigator.clipboard.writeText(myIdSpan.textContent).then(() => alert('¡ID copiado!'));
         });
         callBtn.addEventListener('click', () => makeCall(friendIdInput.value));
         endCallBtn.addEventListener('click', endCall);
@@ -451,8 +433,7 @@
             videoBtn.classList.toggle('active', isVideoOff);
             videoBtn.querySelector('span').textContent = isVideoOff ? 'Activar' : 'Video';
         });
-
-        // Iniciar todo
+        
         initializePeer();
     </script>
 </body>
