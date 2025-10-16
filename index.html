@@ -178,8 +178,8 @@
             conn.on('close', () => removeParticipant(conn.peer));
             conn.on('open', () => {
                 dataConnections[conn.peer] = conn;
-                conn.send({ type: 'request-peer-list' });
                 conn.send({ type: 'user-info', peerId: peer.id, name: myName });
+                broadcastData({ type: 'new-peer-announcement', peerId: conn.peer });
             });
         };
 
@@ -198,21 +198,10 @@
                     participants[data.peerId] = { name: data.name };
                     updateParticipantName(data.peerId, data.name);
                     break;
-                // --- FIX: Lógica de conexión grupal mejorada ---
-                case 'request-peer-list':
-                    const peerList = Object.keys(dataConnections);
-                    if (dataConnections[fromId]) {
-                        dataConnections[fromId].send({ type: 'peer-list', peers: peerList });
+                case 'new-peer-announcement':
+                    if (!calls[data.peerId] && data.peerId !== peer.id) {
+                        makeCall(data.peerId);
                     }
-                    break;
-                case 'peer-list':
-                    data.peers.forEach(peerId => {
-                        if (!dataConnections[peerId] && peerId !== peer.id) {
-                            const conn = peer.connect(peerId, { reliable: true });
-                            setupDataConnection(conn);
-                            makeCall(peerId);
-                        }
-                    });
                     break;
             }
         };
@@ -404,15 +393,23 @@
         };
 
         const setupLocalMedia = async (deviceId = undefined) => {
-            if (localStream) {
-                localStream.getTracks().forEach(track => track.stop());
-            }
-            
-            const constraints = {
+             const constraints = {
                 video: { deviceId: deviceId ? { exact: deviceId } : undefined },
                 audio: true,
             };
-            localStream = await navigator.mediaDevices.getUserMedia(constraints);
+            // ---> FIX: No detener el stream, solo obtener el nuevo track de video
+            const newStream = await navigator.mediaDevices.getUserMedia(constraints);
+            
+            if(!localStream){
+                 localStream = newStream;
+            } else {
+                // Reemplazar solo el track de video, mantener el de audio
+                const newVideoTrack = newStream.getVideoTracks()[0];
+                const oldVideoTrack = localStream.getVideoTracks()[0];
+                localStream.removeTrack(oldVideoTrack);
+                oldVideoTrack.stop();
+                localStream.addTrack(newVideoTrack);
+            }
 
             if (!videoDevices.length) {
                 const devices = await navigator.mediaDevices.enumerateDevices();
@@ -430,10 +427,11 @@
             const localVideo = document.querySelector(`#container-${peer.id} video`);
             if (localVideo) localVideo.srcObject = localStream;
 
+            const newVideoTrack = localStream.getVideoTracks()[0];
             Object.values(calls).forEach(call => {
                 const sender = call.peerConnection.getSenders().find(s => s.track.kind === 'video');
                 if (sender) {
-                    sender.replaceTrack(localStream.getVideoTracks()[0]);
+                    sender.replaceTrack(newVideoTrack);
                 }
             });
         };
