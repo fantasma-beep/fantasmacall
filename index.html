@@ -173,16 +173,13 @@
 
 
         // --- Lógica de Conexión (PeerJS) ---
-        // ---> FIX: Lógica de conexión de 3+ personas reconstruida
         const setupDataConnection = (conn) => {
             conn.on('data', (data) => handleData(conn.peer, data));
             conn.on('close', () => removeParticipant(conn.peer));
             conn.on('open', () => {
                 dataConnections[conn.peer] = conn;
                 conn.send({ type: 'user-info', peerId: peer.id, name: myName });
-                
-                // Anunciar el nuevo peer a los demás
-                broadcastData({ type: 'new-peer', peerId: conn.peer });
+                broadcastData({ type: 'new-peer-announcement', peerId: conn.peer });
             });
         };
 
@@ -201,7 +198,7 @@
                     participants[data.peerId] = { name: data.name };
                     updateParticipantName(data.peerId, data.name);
                     break;
-                case 'new-peer':
+                case 'new-peer-announcement':
                     if (!calls[data.peerId] && data.peerId !== peer.id) {
                         makeCall(data.peerId);
                     }
