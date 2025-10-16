@@ -9,12 +9,9 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     
-    <!--
-      Icono de la App.
-      Asegúrate de tener un archivo llamado 'LOGOFONDO.png' en tu repositorio.
-    -->
-    <link rel="icon" href="LOGOFONDO.png" type="image/png">
-    <link rel="apple-touch-icon" href="LOGOFONDO.png">
+    <!-- FIX: Icono de la App usando un enlace directo y robusto -->
+    <link rel="icon" href="https://i.ibb.co/9vR9zM8/logo-fantasma-fondo.png" type="image/png">
+    <link rel="apple-touch-icon" href="https://i.ibb.co/9vR9zM8/logo-fantasma-fondo.png">
     <meta name="theme-color" content="#202124">
 
     <style>
@@ -56,8 +53,8 @@
         .video-container.fullscreen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 0; z-index: 20;
         }
-        .fullscreen-btn {
-            position: absolute; top: 8px; right: 8px;
+        .video-overlay-button {
+            position: absolute;
             background-color: rgba(0, 0, 0, 0.5);
             border-radius: 50%;
             padding: 6px;
@@ -65,9 +62,9 @@
             z-index: 3;
             transition: transform 0.2s;
         }
-        .fullscreen-btn:hover {
-            transform: scale(1.1);
-        }
+        .video-overlay-button:hover { transform: scale(1.1); }
+        .fullscreen-btn { top: 8px; right: 8px; }
+        .switch-camera-btn { top: 8px; left: 8px; }
     </style>
 </head>
 <body class="flex items-center justify-center h-screen">
@@ -94,14 +91,10 @@
     <div id="call-screen" class="hidden w-full h-full flex flex-col">
         <div class="flex-1 flex flex-col sm:flex-row overflow-hidden">
             <main class="flex-1 p-2 sm:p-4 relative" id="video-grid-container">
-                 <div id="video-grid" class="w-full h-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    <!-- Los videos se agregarán aquí -->
-                 </div>
+                 <div id="video-grid" class="w-full h-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div>
             </main>
             <aside id="chat-panel" class="w-full sm:w-80 bg-gray-800 flex-col h-full border-l border-gray-700 hidden">
-                <div class="p-4 border-b border-gray-700">
-                    <h2 class="text-lg font-semibold">Chat</h2>
-                </div>
+                <div class="p-4 border-b border-gray-700"><h2 class="text-lg font-semibold">Chat</h2></div>
                 <div id="messages" class="flex-1 p-4 overflow-y-auto flex flex-col"></div>
                 <div class="p-4 border-t border-gray-700">
                     <form id="chat-form" class="flex">
@@ -111,7 +104,6 @@
                 </div>
             </aside>
         </div>
-        
         <footer class="w-full bg-black bg-opacity-30 p-2 sm:p-4">
             <div class="max-w-4xl mx-auto flex justify-center items-center space-x-2 sm:space-x-4">
                 <div id="mute-btn" class="control-button w-16 h-14 sm:w-20 sm:h-16">
@@ -127,7 +119,7 @@
                     <span class="text-xs mt-1">Chat</span>
                 </div>
                 <div id="end-call-btn" class="control-button end-call w-16 h-14 sm:w-20 sm:h-16">
-                     <svg class="w-6 h-6" fill="white" viewBox="0 0 24 24"><path d="M3.5 6.5C3.5 5.94772 3.94772 5.5 4.5 5.5H7.52503C7.99416 5.5 8.41164 5.75015 8.6521 6.16209L10.0521 8.56209C10.273 8.93791 10.273 9.41209 10.0521 9.78791L8.6521 12.1879C8.41164 12.6 7.99416 12.85 7.52503 12.85H5.5C4.94772 12.85 4.5 12.4023 4.5 11.85V6.5H3.5ZM3.5 6.5C2.94772 6.5 2.5 6.94772 2.5 7.5V11.85C2.5 13.5023 3.84772 14.85 5.5 14.85H7.52503C8.77534 14.85 9.87116 14.03 10.3521 12.8879L11.7521 10.4879C12.3129 9.45609 12.3129 8.20391 11.7521 7.16209L10.3521 4.76209C9.87116 3.62 8.77534 2.85 7.52503 2.85H4.5C3.5056 2.85 2.62233 3.41121 2.21948 4.28816L1.61625 5.5786C1.53696 5.74833 1.5 5.93581 1.5 6.1293V17.8707C1.5 18.0642 1.53696 18.2517 1.61625 18.4214L2.21948 19.7118C2.62233 20.5888 3.5056 21.15 4.5 21.15H20.5C21.3284 21.15 22 20.4784 22 19.65V18.5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                    <svg class="w-6 h-6" fill="white" viewBox="0 0 24 24"><path d="M3.5 6.5C3.5 5.94772 3.94772 5.5 4.5 5.5H7.52503C7.99416 5.5 8.41164 5.75015 8.6521 6.16209L10.0521 8.56209C10.273 8.93791 10.273 9.41209 10.0521 9.78791L8.6521 12.1879C8.41164 12.6 7.99416 12.85 7.52503 12.85H5.5C4.94772 12.85 4.5 12.4023 4.5 11.85V6.5H3.5ZM3.5 6.5C2.94772 6.5 2.5 6.94772 2.5 7.5V11.85C2.5 13.5023 3.84772 14.85 5.5 14.85H7.52503C8.77534 14.85 9.87116 14.03 10.3521 12.8879L11.7521 10.4879C12.3129 9.45609 12.3129 8.20391 11.7521 7.16209L10.3521 4.76209C9.87116 3.62 8.77534 2.85 7.52503 2.85H4.5C3.5056 2.85 2.62233 3.41121 2.21948 4.28816L1.61625 5.5786C1.53696 5.74833 1.5 5.93581 1.5 6.1293V17.8707C1.5 18.0642 1.53696 18.2517 1.61625 18.4214L2.21948 19.7118C2.62233 20.5888 3.5056 21.15 4.5 21.15H20.5C21.3284 21.15 22 20.4784 22 19.65V18.5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
                     <span class="text-xs mt-1">Salir</span>
                 </div>
             </div>
@@ -177,6 +169,10 @@
         const dataConnections = {};
         let myName = `Fantasma-${Math.floor(Math.random() * 1000)}`;
         const participants = {};
+        // --- NUEVO: Variables para cambio de cámara ---
+        let videoDevices = [];
+        let currentCameraIndex = 0;
+
 
         // --- Lógica de Conexión (PeerJS) ---
         const setupDataConnection = (conn) => {
@@ -185,6 +181,8 @@
             conn.on('data', (data) => handleData(peerId, data));
             conn.on('close', () => removeParticipant(peerId));
             conn.on('open', () => {
+                // Al abrir una nueva conexión, enviamos nuestra info y pedimos la de los demás
+                conn.send({ type: 'request-peer-list' });
                 conn.send({ type: 'user-info', peerId: peer.id, name: myName });
             });
         };
@@ -194,53 +192,48 @@
                 case 'chat':
                     displayMessage(data.fromName, data.message, false);
                     break;
+                // --- NUEVO: Notificación para abrir el chat ---
+                case 'chat-notification':
+                    if (chatPanel.classList.contains('hidden')) {
+                        chatPanel.classList.remove('hidden');
+                        chatPanel.classList.add('flex');
+                    }
+                    break;
                 case 'user-info':
                     participants[data.peerId] = { name: data.name };
                     updateParticipantName(data.peerId, data.name);
                     break;
+                // --- FIX: Lógica mejorada para conectar 3+ personas ---
+                case 'request-peer-list':
+                    const peerList = Object.keys(participants).filter(id => id !== peer.id && id !== fromId);
+                    dataConnections[fromId].send({ type: 'peer-list', peers: peerList });
+                    break;
+                case 'peer-list':
+                    data.peers.forEach(peerId => {
+                        if (!calls[peerId] && peerId !== peer.id) {
+                            makeCall(peerId);
+                        }
+                    });
+                    break;
             }
-        };
-
-        const handleConnectionError = (message) => {
-            myIdSpan.textContent = "Error de conexión";
-            myIdSpan.classList.add('text-red-400');
-            myIdSpan.classList.remove('text-green-400');
-            friendIdInput.disabled = true;
-            callBtn.disabled = true;
-            callBtn.textContent = 'Reintentar';
-            callBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
-            callBtn.classList.add('bg-yellow-600', 'hover:bg-yellow-700');
-            callBtn.onclick = () => window.location.reload();
-            console.error(message);
         };
 
         const initializePeer = async () => {
             friendIdInput.disabled = true;
             callBtn.disabled = true;
             callBtn.textContent = 'Conectando...';
-            callBtn.classList.add('bg-gray-500', 'hover:bg-gray-500');
-            callBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
+            callBtn.classList.add('bg-gray-500');
 
             try {
                 const requestedName = prompt("Ingresa tu nombre para el chat:", myName);
                 if (requestedName) myName = requestedName;
 
-                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-                addVideoStream('local', myName, localStream, true);
+                await setupLocalMedia();
 
-                // ---> FIX: Usando un servidor PeerJS público y robusto
-                peer = new Peer(undefined, {
-                    host: 'peerjs.92k.de',
-                    secure: true,
-                    port: 443,
-                });
-
-                const connectionTimeout = setTimeout(() => {
-                    handleConnectionError("No se pudo conectar al servidor de llamadas. Revisa tu conexión e inténtalo de nuevo.");
-                }, 10000);
+                // ---> FIX: Volvemos al servidor por defecto que funcionaba
+                peer = new Peer(); 
 
                 peer.on('open', (id) => {
-                    clearTimeout(connectionTimeout);
                     myIdSpan.textContent = id;
                     participants[id] = { name: myName };
                     const localVideoContainer = document.getElementById('container-local');
@@ -249,8 +242,7 @@
                     friendIdInput.disabled = false;
                     callBtn.disabled = false;
                     callBtn.textContent = 'Unirse';
-                    callBtn.classList.remove('bg-gray-500', 'hover:bg-gray-500');
-                    callBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+                    callBtn.classList.remove('bg-gray-500');
                 });
 
                 peer.on('call', (call) => {
@@ -271,19 +263,17 @@
                                 incomingCallModal.classList.add('hidden');
                             };
                         }
-                    }, 100);
+                    }, 200);
                 });
 
                 peer.on('connection', (conn) => setupDataConnection(conn));
-                peer.on('error', (err) => {
-                     handleConnectionError(`Error de conexión: ${err.type}. Recarga la página.`);
-                });
+                peer.on('error', (err) => console.error('Error de PeerJS:', err));
 
             } catch (error) {
                 alert("No se pudo acceder a tu cámara y micrófono. Revisa los permisos.");
             }
         };
-        
+
         const answerCall = (call) => {
             const callerId = call.peer;
             call.answer(localStream);
@@ -335,7 +325,13 @@
             const message = chatInput.value;
             if (message.trim() === '') return;
             const data = { type: 'chat', fromName: myName, message: message };
-            Object.values(dataConnections).forEach(conn => conn.send(data));
+            // --- NUEVO: Enviar notificación de chat ---
+            const notification = { type: 'chat-notification' };
+
+            Object.values(dataConnections).forEach(conn => {
+                conn.send(data);
+                conn.send(notification);
+            });
             displayMessage('Tú', message, true);
             chatInput.value = '';
         };
@@ -363,21 +359,69 @@
             container.appendChild(nameTag);
             
             const fullscreenBtn = document.createElement('div');
-            fullscreenBtn.className = 'fullscreen-btn';
+            fullscreenBtn.className = 'video-overlay-button fullscreen-btn';
             fullscreenBtn.innerHTML = `<svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 0h-4m4 0l-5-5"></path></svg>`;
             fullscreenBtn.onclick = (e) => {
                 e.stopPropagation();
                 toggleFullscreen(container);
             };
             container.appendChild(fullscreenBtn);
+
+            // --- NUEVO: Añadir botón de cambiar cámara solo a nuestro video ---
+            if (id === 'local' && videoDevices.length > 1) {
+                const switchCamBtn = document.createElement('div');
+                switchCamBtn.className = 'video-overlay-button switch-camera-btn';
+                switchCamBtn.innerHTML = `<svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h5M20 20v-5h-5M4 20h5v-5M20 4h-5v5"></path></svg>`;
+                switchCamBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    switchCamera();
+                };
+                container.appendChild(switchCamBtn);
+            }
             
             videoGrid.appendChild(container);
         };
         
+        // --- NUEVO: Lógica para cambiar de cámara ---
+        const setupLocalMedia = async (deviceId = undefined) => {
+            const constraints = {
+                video: { deviceId: deviceId ? { exact: deviceId } : undefined },
+                audio: true,
+            };
+            localStream = await navigator.mediaDevices.getUserMedia(constraints);
+
+            if (!videoDevices.length) {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                videoDevices = devices.filter(d => d.kind === 'videoinput');
+            }
+        };
+
+        const switchCamera = async () => {
+            if (videoDevices.length < 2) return;
+            currentCameraIndex = (currentCameraIndex + 1) % videoDevices.length;
+            const nextCameraId = videoDevices[currentCameraIndex].deviceId;
+
+            // Detener tracks antiguos
+            localStream.getTracks().forEach(track => track.stop());
+
+            await setupLocalMedia(nextCameraId);
+            
+            const localVideo = document.querySelector(`#container-${peer.id} video`);
+            if (localVideo) localVideo.srcObject = localStream;
+
+            // Actualizar el stream para todos los peers
+            for (const peerId in calls) {
+                const call = calls[peerId];
+                const sender = call.peerConnection.getSenders().find(s => s.track.kind === 'video');
+                if (sender) {
+                    sender.replaceTrack(localStream.getVideoTracks()[0]);
+                }
+            }
+        };
+
         const toggleFullscreen = (container) => {
             const isFullscreen = container.classList.contains('fullscreen');
             const btn = container.querySelector('.fullscreen-btn');
-
             document.querySelector('.fullscreen')?.classList.remove('fullscreen');
             
             if (!isFullscreen) {
