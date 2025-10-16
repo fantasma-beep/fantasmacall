@@ -178,6 +178,7 @@
             conn.on('close', () => removeParticipant(conn.peer));
             conn.on('open', () => {
                 dataConnections[conn.peer] = conn;
+                conn.send({ type: 'request-peer-list' });
                 conn.send({ type: 'user-info', peerId: peer.id, name: myName });
             });
         };
@@ -196,13 +197,22 @@
                 case 'user-info':
                     participants[data.peerId] = { name: data.name };
                     updateParticipantName(data.peerId, data.name);
-                    // ---> FIX: Anunciar nuevo usuario a los demás para que se conecten
-                    broadcastData({ type: 'new-peer-announcement', peerId: data.peerId }, fromId);
                     break;
-                case 'new-peer-announcement':
-                    if (!calls[data.peerId] && data.peerId !== peer.id) {
-                        makeCall(data.peerId);
+                // --- FIX: Lógica de conexión grupal mejorada ---
+                case 'request-peer-list':
+                    const peerList = Object.keys(dataConnections);
+                    if (dataConnections[fromId]) {
+                        dataConnections[fromId].send({ type: 'peer-list', peers: peerList });
                     }
+                    break;
+                case 'peer-list':
+                    data.peers.forEach(peerId => {
+                        if (!dataConnections[peerId] && peerId !== peer.id) {
+                            const conn = peer.connect(peerId, { reliable: true });
+                            setupDataConnection(conn);
+                            makeCall(peerId);
+                        }
+                    });
                     break;
             }
         };
@@ -220,7 +230,6 @@
                 await setupLocalMedia();
                 addVideoStream('local', myName, localStream, true);
 
-                // ---> FIX: Usando un servidor PeerJS público y robusto
                 peer = new Peer({
                     host: 'peerjs.92k.de',
                     secure: true,
@@ -311,12 +320,8 @@
             call.on('close', () => removeParticipant(friendId));
         };
         
-        const broadcastData = (data, excludeId = null) => {
-             Object.values(dataConnections).forEach(conn => {
-                if (conn.peer !== excludeId) {
-                    conn.send(data);
-                }
-             });
+        const broadcastData = (data) => {
+             Object.values(dataConnections).forEach(conn => conn.send(data));
         }
 
         const displayMessage = (fromName, message, isSent) => {
@@ -383,7 +388,6 @@
         };
         
         const addCameraSwitchButton = (id) => {
-            // FIX: Ahora el botón de cámara se añade correctamente
             if (videoDevices.length > 1) {
                 const container = document.getElementById(`container-${id}`);
                 if(container && !container.querySelector('.switch-camera-btn')) {
@@ -410,7 +414,6 @@
             };
             localStream = await navigator.mediaDevices.getUserMedia(constraints);
 
-            // FIX: Se obtienen los dispositivos ANTES de intentar añadir el botón
             if (!videoDevices.length) {
                 const devices = await navigator.mediaDevices.enumerateDevices();
                 videoDevices = devices.filter(d => d.kind === 'videoinput');
