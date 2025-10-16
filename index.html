@@ -174,7 +174,6 @@
                     updateParticipantName(data.peerId, data.name);
                     
                     if (!calls[data.peerId] && data.peerId !== peer.id) {
-                        console.log(`Notificado del nuevo usuario ${data.name} (${data.peerId}). Llamando.`);
                         makeCall(data.peerId, data.name);
                     }
                     break;
@@ -209,9 +208,8 @@
                     callBtn.classList.add('bg-green-600', 'hover:bg-green-700');
                 });
 
-                // ---> FIX: MOSTRAR PANTALLA DE LLAMADA AL RECIBIR UNA
                 peer.on('call', (call) => {
-                    showCallScreen(); // <--- LA CORRECCIÓN CLAVE
+                    showCallScreen(); 
                     
                     call.answer(localStream);
                     const peerId = call.peer;
@@ -312,7 +310,6 @@
         };
         
         const removeParticipant = (peerId) => {
-            console.log(`Eliminando participante: ${peerId}`);
             const container = document.getElementById(`container-${peerId}`);
             if (container) container.remove();
             if (calls[peerId]) delete calls[peerId];
@@ -331,14 +328,16 @@
             showConnectionScreen();
         };
         
+        // ---> FIX: Función de cambio de pantalla más robusta
         const showCallScreen = () => {
-            connectionScreen.classList.add('hidden');
-            callScreen.classList.remove('hidden');
+            connectionScreen.style.display = 'none';
+            callScreen.style.display = 'flex';
         };
 
         const showConnectionScreen = () => {
-            callScreen.classList.add('hidden');
-            connectionScreen.classList.remove('hidden');
+            callScreen.style.display = 'none';
+            connectionScreen.style.display = 'block';
+            
             Array.from(videoGrid.children).forEach(child => {
                 if(child.id !== `container-${peer.id}`) {
                     child.remove();
