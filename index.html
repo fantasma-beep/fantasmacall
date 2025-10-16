@@ -142,76 +142,68 @@
         let myName = `Fantasma-${Math.floor(Math.random() * 1000)}`;
 
         // --- Lógica de Conexión (PeerJS) ---
-
-        // Configura una conexión de datos para chat y señalización interna
         const setupDataConnection = (conn) => {
             const peerId = conn.peer;
             dataConnections[peerId] = conn;
-
-            conn.on('data', (data) => {
-                handleData(peerId, data);
-            });
-            conn.on('close', () => {
-                removeParticipant(peerId);
-            });
-             conn.on('open', () => {
-                // Notificar a los demás sobre nuestra presencia
+            conn.on('data', (data) => handleData(peerId, data));
+            conn.on('close', () => removeParticipant(peerId));
+            conn.on('open', () => {
+                // Notificar a nuestros otros contactos sobre el nuevo usuario
                 Object.values(dataConnections).forEach(c => {
-                    if (c.peer !== peerId) { // No te notifiques a ti mismo
-                        c.send({ type: 'user-connected', peerId: peer.id, name: myName });
+                    // Notificamos a otros sobre el nuevo peer
+                    if (c.peer !== peerId) {
+                        c.send({ type: 'user-connected', peerId: peerId, name: 'Nuevo Usuario' }); // El nombre se actualizará
                     }
+                    // Notificamos al nuevo peer sobre nosotros
+                    conn.send({ type: 'user-connected', peerId: peer.id, name: myName });
                 });
             });
         };
 
-        // Maneja los datos recibidos (chat, nuevos usuarios, etc.)
         const handleData = (fromId, data) => {
             switch (data.type) {
                 case 'chat':
                     displayMessage(data.fromName, data.message, false);
                     break;
                 case 'user-connected':
-                    // Si no estamos conectados a este usuario, llamarlo
                     if (!calls[data.peerId] && data.peerId !== peer.id) {
-                        console.log(`Notificado del nuevo usuario ${data.name}. Llamando.`);
+                        console.log(`Notificado del nuevo usuario ${data.name} (${data.peerId}). Llamando.`);
                         makeCall(data.peerId, data.name);
+                    }
+                    // Actualizar nombre si ya existe el video
+                    const nameTag = document.querySelector(`#container-${data.peerId} .participant-name`);
+                    if (nameTag && nameTag.textContent !== data.name) {
+                        nameTag.textContent = data.name;
                     }
                     break;
             }
         };
 
-        // Inicia la instancia de PeerJS y obtiene el stream de medios
         const initializePeer = async () => {
             try {
                 const requestedName = prompt("Ingresa tu nombre para el chat:", myName);
                 if (requestedName) myName = requestedName;
 
                 localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-                addVideoStream(peer ? peer.id : 'local', myName, localStream, true);
+                addVideoStream('local', myName, localStream, true);
 
                 peer = new Peer();
-
                 peer.on('open', (id) => {
                     myIdSpan.textContent = id;
-                    // Actualizamos el ID de nuestro video local una vez que lo tenemos
                     const localVideoContainer = document.getElementById('container-local');
-                    if(localVideoContainer) localVideoContainer.id = `container-${id}`;
+                    if (localVideoContainer) localVideoContainer.id = `container-${id}`;
                 });
 
-                // Escuchar por llamadas entrantes
                 peer.on('call', (call) => {
                     call.answer(localStream);
                     const peerId = call.peer;
                     calls[peerId] = call;
-
                     call.on('stream', (remoteStream) => {
-                        // El nombre vendrá por el canal de datos
                         addVideoStream(peerId, `Conectando...`, remoteStream);
                     });
                     call.on('close', () => removeParticipant(peerId));
                 });
 
-                // Escuchar por conexiones de datos entrantes
                 peer.on('connection', (conn) => {
                     setupDataConnection(conn);
                 });
@@ -220,18 +212,17 @@
                     console.error('Error de PeerJS:', err);
                     alert('Hubo un error de conexión. Por favor, recarga la página.');
                 });
-
             } catch (error) {
                 console.error("Error al acceder a la cámara/micrófono:", error);
-                alert("No se pudo acceder a tu cámara y micrófono. Por favor, revisa los permisos.");
+                alert("No se pudo acceder a tu cámara y micrófono. Revisa los permisos.");
             }
         };
 
-        // Realiza una llamada a un nuevo participante
         const makeCall = (friendId, friendName = `Amigo`) => {
-            if (!friendId || calls[friendId]) return;
+            if (!friendId || calls[friendId] || friendId === peer.id) return;
+            console.log(`Realizando llamada a ${friendId}`);
 
-            const conn = peer.connect(friendId);
+            const conn = peer.connect(friendId, { reliable: true });
             setupDataConnection(conn);
             
             const call = peer.call(friendId, localStream);
@@ -245,46 +236,69 @@
             showCallScreen();
         };
         
-        // --- Funciones del Chat ---
+        // --- Funciones del Chat (CORREGIDAS) ---
         const displayMessage = (fromName, message, isSent) => {
-            // ... (código sin cambios)
+            const messageEl = document.createElement('div');
+            messageEl.textContent = message;
+            messageEl.className = isSent ? 'chat-message sent' : 'chat-message received';
+            
+            const senderEl = document.createElement('div');
+            senderEl.className = 'text-xs text-gray-400 mb-1';
+            senderEl.textContent = isSent ? 'Tú' : fromName;
+
+            const container = document.createElement('div');
+            container.className = `w-full flex flex-col ${isSent ? 'items-end' : 'items-start'}`;
+            container.appendChild(senderEl);
+            container.appendChild(messageEl);
+
+            messagesDiv.appendChild(container);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
         };
         
         const sendMessage = (e) => {
             e.preventDefault();
             const message = chatInput.value;
             if (message.trim() === '') return;
-
             const data = { type: 'chat', fromName: myName, message: message };
-
             Object.values(dataConnections).forEach(conn => conn.send(data));
             displayMessage('Tú', message, true);
             chatInput.value = '';
         };
 
-        // --- Funciones de UI ---
+        // --- Funciones de UI (CORREGIDAS) ---
         const addVideoStream = (id, name, stream, isMuted = false) => {
             if (document.getElementById(`container-${id}`)) {
-                // Si el contenedor existe, solo actualizamos el nombre
                 const nameTag = document.querySelector(`#container-${id} .participant-name`);
                 if(nameTag) nameTag.textContent = name;
                 return;
-            };
-            // ... (código para crear elementos sin cambios)
+            }
+            const container = document.createElement('div');
+            container.id = `container-${id}`;
+            container.className = 'video-container aspect-video';
+            const video = document.createElement('video');
+            video.srcObject = stream;
+            video.autoplay = true;
+            video.playsInline = true;
+            video.muted = isMuted;
+            container.appendChild(video);
+            const nameTag = document.createElement('div');
+            nameTag.className = 'participant-name';
+            nameTag.textContent = name;
+            container.appendChild(nameTag);
+            videoGrid.appendChild(container);
         };
         
         const removeParticipant = (peerId) => {
             console.log(`Eliminando participante: ${peerId}`);
             const container = document.getElementById(`container-${peerId}`);
             if (container) container.remove();
-            delete calls[peerId];
-            delete dataConnections[peerId];
+            if (calls[peerId]) delete calls[peerId];
+            if (dataConnections[peerId]) delete dataConnections[peerId];
         };
 
         const endCall = () => {
             Object.values(calls).forEach(call => call.close());
             Object.values(dataConnections).forEach(conn => conn.close());
-            // Limpiar objetos
             for (const key in calls) delete calls[key];
             for (const key in dataConnections) delete dataConnections[key];
             showConnectionScreen();
@@ -301,11 +315,12 @@
             videoGrid.innerHTML = '';
             friendIdInput.value = '';
             messagesDiv.innerHTML = '';
-            // Volver a agregar nuestro video local
-            addVideoStream(peer ? peer.id : 'local', myName, localStream, true);
+            if (localStream) {
+                addVideoStream(peer ? peer.id : 'local', myName, localStream, true);
+            }
         };
 
-        // --- Event Listeners ---
+        // --- Event Listeners (CORREGIDOS) ---
         copyIdBtn.addEventListener('click', () => {
             navigator.clipboard.writeText(myIdSpan.textContent).then(() => {
                 alert('¡ID copiado al portapapeles!');
@@ -319,11 +334,17 @@
         });
 
         muteBtn.addEventListener('click', () => {
-             // ... (código sin cambios)
+            isMuted = !isMuted;
+            localStream.getAudioTracks()[0].enabled = !isMuted;
+            muteBtn.classList.toggle('active', isMuted);
+            muteBtn.querySelector('span').textContent = isMuted ? 'Reactivar' : 'Silenciar';
         });
 
         videoBtn.addEventListener('click', () => {
-             // ... (código sin cambios)
+            isVideoOff = !isVideoOff;
+            localStream.getVideoTracks()[0].enabled = !isVideoOff;
+            videoBtn.classList.toggle('active', isVideoOff);
+            videoBtn.querySelector('span').textContent = isVideoOff ? 'Activar' : 'Video';
         });
 
         // Iniciar todo
