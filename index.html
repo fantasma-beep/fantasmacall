@@ -171,14 +171,15 @@
         let videoDevices = [];
         let currentCameraIndex = 0;
 
-
         // --- Lógica de Conexión (PeerJS) ---
         const setupDataConnection = (conn) => {
             conn.on('data', (data) => handleData(conn.peer, data));
             conn.on('close', () => removeParticipant(conn.peer));
             conn.on('open', () => {
                 dataConnections[conn.peer] = conn;
+                // Al conectar, envía nuestra info y pide la lista de todos los demás
                 conn.send({ type: 'user-info', peerId: peer.id, name: myName });
+                conn.send({ type: 'request-peer-list' });
             });
         };
 
@@ -196,13 +197,21 @@
                 case 'user-info':
                     participants[data.peerId] = { name: data.name };
                     updateParticipantName(data.peerId, data.name);
-                    // ---> FIX: Notificar a otros sobre este nuevo usuario
-                    broadcastData({ type: 'new-peer-announcement', peerId: data.peerId }, fromId);
                     break;
-                case 'new-peer-announcement':
-                    if (!calls[data.peerId] && data.peerId !== peer.id) {
-                        makeCall(data.peerId);
+                // --- FIX: Lógica de conexión grupal mejorada ---
+                case 'request-peer-list':
+                    const peerList = Object.keys(dataConnections);
+                    if (dataConnections[fromId]) {
+                        dataConnections[fromId].send({ type: 'peer-list', peers: peerList });
                     }
+                    break;
+                case 'peer-list':
+                    data.peers.forEach(peerId => {
+                        if (!dataConnections[peerId] && peerId !== peer.id) {
+                            const conn = peer.connect(peerId, { reliable: true });
+                            setupDataConnection(conn);
+                        }
+                    });
                     break;
             }
         };
@@ -218,9 +227,10 @@
                 if (requestedName) myName = requestedName;
 
                 await setupLocalMedia();
+                addVideoStream('local', myName, localStream, true);
 
                 // ---> FIX: Usando un servidor PeerJS público y robusto
-                peer = new Peer(undefined, {
+                peer = new Peer({
                     host: 'peerjs.92k.de',
                     secure: true,
                     port: 443,
@@ -231,7 +241,11 @@
                     myIdSpan.textContent = id;
                     participants[id] = { name: myName };
                     const localVideoContainer = document.getElementById('container-local');
-                    if (localVideoContainer) localVideoContainer.id = `container-${id}`;
+                    if (localVideoContainer) {
+                        localVideoContainer.id = `container-${id}`;
+                        // FIX: Añadir botón de cámara después de tener el ID
+                        addCameraSwitchButton(id);
+                    }
                     
                     friendIdInput.disabled = false;
                     callBtn.disabled = false;
@@ -241,28 +255,33 @@
 
                 peer.on('call', (call) => {
                     const callerId = call.peer;
+                    let callerName = 'Alguien';
+                    
                     const checkCallerInfo = setInterval(() => {
                         if (participants[callerId]) {
-                            clearInterval(checkCallerInfo);
-                            callerNameSpan.textContent = participants[callerId].name;
-                            incomingCallModal.classList.remove('hidden');
-
-                            acceptCallBtn.onclick = () => {
-                                incomingCallModal.classList.add('hidden');
-                                showCallScreen();
-                                answerCall(call);
-                            };
-
-                            declineCallBtn.onclick = () => {
-                                incomingCallModal.classList.add('hidden');
-                            };
+                            callerName = participants[callerId].name;
                         }
+                        callerNameSpan.textContent = callerName;
                     }, 200);
+
+                    incomingCallModal.classList.remove('hidden');
+
+                    acceptCallBtn.onclick = () => {
+                        clearInterval(checkCallerInfo);
+                        incomingCallModal.classList.add('hidden');
+                        showCallScreen();
+                        answerCall(call);
+                    };
+
+                    declineCallBtn.onclick = () => {
+                        clearInterval(checkCallerInfo);
+                        incomingCallModal.classList.add('hidden');
+                    };
                 });
 
                 peer.on('connection', (conn) => setupDataConnection(conn));
                 peer.on('error', (err) => {
-                    console.error('Error de PeerJS:', err)
+                    console.error('Error de PeerJS:', err);
                     alert('Error de conexión. Intenta recargar la página.');
                 });
 
@@ -287,7 +306,7 @@
         };
 
         const makeCall = (friendId) => {
-            if (!friendId || calls[friendId] || friendId === peer.id) return;
+            if (!friendId || calls[friendId] || dataConnections[friendId] || friendId === peer.id) return;
             showCallScreen();
             
             const conn = peer.connect(friendId, { reliable: true });
@@ -302,12 +321,8 @@
             call.on('close', () => removeParticipant(friendId));
         };
         
-        const broadcastData = (data, excludeId = null) => {
-             Object.values(dataConnections).forEach(conn => {
-                if (conn.peer !== excludeId) {
-                    conn.send(data);
-                }
-             });
+        const broadcastData = (data) => {
+             Object.values(dataConnections).forEach(conn => conn.send(data));
         }
 
         const displayMessage = (fromName, message, isSent) => {
@@ -369,23 +384,28 @@
                 toggleFullscreen(container);
             };
             container.appendChild(fullscreenBtn);
-
-            if (id === 'local' && videoDevices.length > 1) {
-                const switchCamBtn = document.createElement('div');
-                switchCamBtn.className = 'video-overlay-button switch-camera-btn';
-                switchCamBtn.innerHTML = `<svg class="w-6 h-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h5M20 20v-5h-5m-5 5h5v-5M4 9V4h5" /></svg>`;
-                switchCamBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    switchCamera();
-                };
-                container.appendChild(switchCamBtn);
-            }
             
             videoGrid.appendChild(container);
         };
         
+        // --- FIX: Función separada para añadir el botón de cambio de cámara
+        const addCameraSwitchButton = (id) => {
+            if (videoDevices.length > 1) {
+                const container = document.getElementById(`container-${id}`);
+                if(container && !container.querySelector('.switch-camera-btn')) {
+                    const switchCamBtn = document.createElement('div');
+                    switchCamBtn.className = 'video-overlay-button switch-camera-btn';
+                    switchCamBtn.innerHTML = `<svg class="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"></path><path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14"></path></svg>`;
+                    switchCamBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        switchCamera();
+                    };
+                    container.appendChild(switchCamBtn);
+                }
+            }
+        };
+
         const setupLocalMedia = async (deviceId = undefined) => {
-            // Detener tracks antiguos si existen
             if (localStream) {
                 localStream.getTracks().forEach(track => track.stop());
             }
@@ -412,13 +432,12 @@
             const localVideo = document.querySelector(`#container-${peer.id} video`);
             if (localVideo) localVideo.srcObject = localStream;
 
-            for (const peerId in calls) {
-                const call = calls[peerId];
+            Object.values(calls).forEach(call => {
                 const sender = call.peerConnection.getSenders().find(s => s.track.kind === 'video');
                 if (sender) {
                     sender.replaceTrack(localStream.getVideoTracks()[0]);
                 }
-            }
+            });
         };
 
         const toggleFullscreen = (container) => {
