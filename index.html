@@ -178,8 +178,7 @@
             conn.on('close', () => removeParticipant(conn.peer));
             conn.on('open', () => {
                 dataConnections[conn.peer] = conn;
-                conn.send({ type: 'user-info', peerId: peer.id, name: myName });
-                broadcastData({ type: 'new-peer-announcement', peerId: conn.peer });
+                conn.send({ type: 'request-peer-list' });
             });
         };
 
@@ -198,9 +197,23 @@
                     participants[data.peerId] = { name: data.name };
                     updateParticipantName(data.peerId, data.name);
                     break;
-                case 'new-peer-announcement':
-                    if (!calls[data.peerId] && data.peerId !== peer.id) {
-                        makeCall(data.peerId);
+                case 'request-peer-list':
+                    const peerList = Object.keys(dataConnections);
+                    if (dataConnections[fromId]) {
+                        dataConnections[fromId].send({ type: 'peer-list', peers: peerList });
+                    }
+                    break;
+                case 'peer-list':
+                    data.peers.forEach(peerId => {
+                        if (!dataConnections[peerId] && peerId !== peer.id) {
+                            const conn = peer.connect(peerId, { reliable: true });
+                            setupDataConnection(conn);
+                            makeCall(peerId);
+                        }
+                    });
+                    // Enviar nuestra info al que nos dio la lista
+                    if(dataConnections[fromId]) {
+                       dataConnections[fromId].send({ type: 'user-info', peerId: peer.id, name: myName });
                     }
                     break;
             }
@@ -309,8 +322,12 @@
             call.on('close', () => removeParticipant(friendId));
         };
         
-        const broadcastData = (data) => {
-             Object.values(dataConnections).forEach(conn => conn.send(data));
+        const broadcastData = (data, excludeId = null) => {
+             Object.values(dataConnections).forEach(conn => {
+                if (conn && conn.peer !== excludeId) {
+                    conn.send(data);
+                }
+             });
         }
 
         const displayMessage = (fromName, message, isSent) => {
@@ -392,42 +409,34 @@
             }
         };
 
-        const setupLocalMedia = async (deviceId = undefined) => {
-             const constraints = {
-                video: { deviceId: deviceId ? { exact: deviceId } : undefined },
+        const setupLocalMedia = async () => {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            videoDevices = devices.filter(d => d.kind === 'videoinput');
+            const constraints = {
+                video: true,
                 audio: true,
             };
-            // ---> FIX: No detener el stream, solo obtener el nuevo track de video
-            const newStream = await navigator.mediaDevices.getUserMedia(constraints);
-            
-            if(!localStream){
-                 localStream = newStream;
-            } else {
-                // Reemplazar solo el track de video, mantener el de audio
-                const newVideoTrack = newStream.getVideoTracks()[0];
-                const oldVideoTrack = localStream.getVideoTracks()[0];
-                localStream.removeTrack(oldVideoTrack);
-                oldVideoTrack.stop();
-                localStream.addTrack(newVideoTrack);
-            }
-
-            if (!videoDevices.length) {
-                const devices = await navigator.mediaDevices.enumerateDevices();
-                videoDevices = devices.filter(d => d.kind === 'videoinput');
-            }
+            localStream = await navigator.mediaDevices.getUserMedia(constraints);
         };
 
+        // ---> FIX: Lógica de cambio de cámara reconstruida para no perder el audio
         const switchCamera = async () => {
             if (videoDevices.length < 2) return;
             currentCameraIndex = (currentCameraIndex + 1) % videoDevices.length;
             const nextCameraId = videoDevices[currentCameraIndex].deviceId;
 
-            await setupLocalMedia(nextCameraId);
-            
+            const newVideoTrack = await navigator.mediaDevices.getUserMedia({
+                video: { deviceId: { exact: nextCameraId } }
+            }).then(stream => stream.getVideoTracks()[0]);
+
             const localVideo = document.querySelector(`#container-${peer.id} video`);
+            const oldVideoTrack = localStream.getVideoTracks()[0];
+            localStream.removeTrack(oldVideoTrack);
+            oldVideoTrack.stop();
+            localStream.addTrack(newVideoTrack);
+            
             if (localVideo) localVideo.srcObject = localStream;
 
-            const newVideoTrack = localStream.getVideoTracks()[0];
             Object.values(calls).forEach(call => {
                 const sender = call.peerConnection.getSenders().find(s => s.track.kind === 'video');
                 if (sender) {
@@ -435,6 +444,7 @@
                 }
             });
         };
+
 
         const toggleFullscreen = (container) => {
             const isFullscreen = container.classList.contains('fullscreen');
