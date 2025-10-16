@@ -169,7 +169,6 @@
         const dataConnections = {};
         let myName = `Fantasma-${Math.floor(Math.random() * 1000)}`;
         const participants = {};
-        // --- NUEVO: Variables para cambio de cámara ---
         let videoDevices = [];
         let currentCameraIndex = 0;
 
@@ -181,7 +180,6 @@
             conn.on('data', (data) => handleData(peerId, data));
             conn.on('close', () => removeParticipant(peerId));
             conn.on('open', () => {
-                // Al abrir una nueva conexión, enviamos nuestra info y pedimos la de los demás
                 conn.send({ type: 'request-peer-list' });
                 conn.send({ type: 'user-info', peerId: peer.id, name: myName });
             });
@@ -192,7 +190,6 @@
                 case 'chat':
                     displayMessage(data.fromName, data.message, false);
                     break;
-                // --- NUEVO: Notificación para abrir el chat ---
                 case 'chat-notification':
                     if (chatPanel.classList.contains('hidden')) {
                         chatPanel.classList.remove('hidden');
@@ -203,10 +200,11 @@
                     participants[data.peerId] = { name: data.name };
                     updateParticipantName(data.peerId, data.name);
                     break;
-                // --- FIX: Lógica mejorada para conectar 3+ personas ---
                 case 'request-peer-list':
                     const peerList = Object.keys(participants).filter(id => id !== peer.id && id !== fromId);
-                    dataConnections[fromId].send({ type: 'peer-list', peers: peerList });
+                    if(dataConnections[fromId]) {
+                        dataConnections[fromId].send({ type: 'peer-list', peers: peerList });
+                    }
                     break;
                 case 'peer-list':
                     data.peers.forEach(peerId => {
@@ -230,8 +228,13 @@
 
                 await setupLocalMedia();
 
-                // ---> FIX: Volvemos al servidor por defecto que funcionaba
-                peer = new Peer(); 
+                // ---> FIX: Usando un servidor PeerJS público y robusto
+                peer = new Peer({
+                    host: 'peerjs.92k.de',
+                    secure: true,
+                    port: 443,
+                    path: '/'
+                });
 
                 peer.on('open', (id) => {
                     myIdSpan.textContent = id;
@@ -267,7 +270,10 @@
                 });
 
                 peer.on('connection', (conn) => setupDataConnection(conn));
-                peer.on('error', (err) => console.error('Error de PeerJS:', err));
+                peer.on('error', (err) => {
+                    console.error('Error de PeerJS:', err)
+                    alert('Error de conexión. Intenta recargar la página.');
+                });
 
             } catch (error) {
                 alert("No se pudo acceder a tu cámara y micrófono. Revisa los permisos.");
@@ -325,7 +331,6 @@
             const message = chatInput.value;
             if (message.trim() === '') return;
             const data = { type: 'chat', fromName: myName, message: message };
-            // --- NUEVO: Enviar notificación de chat ---
             const notification = { type: 'chat-notification' };
 
             Object.values(dataConnections).forEach(conn => {
@@ -367,7 +372,6 @@
             };
             container.appendChild(fullscreenBtn);
 
-            // --- NUEVO: Añadir botón de cambiar cámara solo a nuestro video ---
             if (id === 'local' && videoDevices.length > 1) {
                 const switchCamBtn = document.createElement('div');
                 switchCamBtn.className = 'video-overlay-button switch-camera-btn';
@@ -382,7 +386,6 @@
             videoGrid.appendChild(container);
         };
         
-        // --- NUEVO: Lógica para cambiar de cámara ---
         const setupLocalMedia = async (deviceId = undefined) => {
             const constraints = {
                 video: { deviceId: deviceId ? { exact: deviceId } : undefined },
@@ -401,7 +404,6 @@
             currentCameraIndex = (currentCameraIndex + 1) % videoDevices.length;
             const nextCameraId = videoDevices[currentCameraIndex].deviceId;
 
-            // Detener tracks antiguos
             localStream.getTracks().forEach(track => track.stop());
 
             await setupLocalMedia(nextCameraId);
@@ -409,7 +411,6 @@
             const localVideo = document.querySelector(`#container-${peer.id} video`);
             if (localVideo) localVideo.srcObject = localStream;
 
-            // Actualizar el stream para todos los peers
             for (const peerId in calls) {
                 const call = calls[peerId];
                 const sender = call.peerConnection.getSenders().find(s => s.track.kind === 'video');
