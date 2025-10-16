@@ -9,7 +9,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     
-    <!-- FIX: Icono de la App usando un enlace directo y robusto -->
     <link rel="icon" href="https://i.ibb.co/9vR9zM8/logo-fantasma-fondo.png" type="image/png">
     <link rel="apple-touch-icon" href="https://i.ibb.co/9vR9zM8/logo-fantasma-fondo.png">
     <meta name="theme-color" content="#202124">
@@ -174,14 +173,16 @@
 
 
         // --- Lógica de Conexión (PeerJS) ---
+        // ---> FIX: Lógica de conexión de 3+ personas reconstruida
         const setupDataConnection = (conn) => {
-            const peerId = conn.peer;
-            dataConnections[peerId] = conn;
-            conn.on('data', (data) => handleData(peerId, data));
-            conn.on('close', () => removeParticipant(peerId));
+            conn.on('data', (data) => handleData(conn.peer, data));
+            conn.on('close', () => removeParticipant(conn.peer));
             conn.on('open', () => {
-                conn.send({ type: 'request-peer-list' });
+                dataConnections[conn.peer] = conn;
                 conn.send({ type: 'user-info', peerId: peer.id, name: myName });
+                
+                // Anunciar el nuevo peer a los demás
+                broadcastData({ type: 'new-peer', peerId: conn.peer });
             });
         };
 
@@ -200,18 +201,10 @@
                     participants[data.peerId] = { name: data.name };
                     updateParticipantName(data.peerId, data.name);
                     break;
-                case 'request-peer-list':
-                    const peerList = Object.keys(participants).filter(id => id !== peer.id && id !== fromId);
-                    if(dataConnections[fromId]) {
-                        dataConnections[fromId].send({ type: 'peer-list', peers: peerList });
+                case 'new-peer':
+                    if (!calls[data.peerId] && data.peerId !== peer.id) {
+                        makeCall(data.peerId);
                     }
-                    break;
-                case 'peer-list':
-                    data.peers.forEach(peerId => {
-                        if (!calls[peerId] && peerId !== peer.id) {
-                            makeCall(peerId);
-                        }
-                    });
                     break;
             }
         };
@@ -311,6 +304,10 @@
             call.on('close', () => removeParticipant(friendId));
         };
         
+        const broadcastData = (data) => {
+             Object.values(dataConnections).forEach(conn => conn.send(data));
+        }
+
         const displayMessage = (fromName, message, isSent) => {
             const messageEl = document.createElement('div');
             messageEl.textContent = message;
@@ -333,10 +330,9 @@
             const data = { type: 'chat', fromName: myName, message: message };
             const notification = { type: 'chat-notification' };
 
-            Object.values(dataConnections).forEach(conn => {
-                conn.send(data);
-                conn.send(notification);
-            });
+            broadcastData(data);
+            broadcastData(notification);
+
             displayMessage('Tú', message, true);
             chatInput.value = '';
         };
@@ -375,7 +371,7 @@
             if (id === 'local' && videoDevices.length > 1) {
                 const switchCamBtn = document.createElement('div');
                 switchCamBtn.className = 'video-overlay-button switch-camera-btn';
-                switchCamBtn.innerHTML = `<svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h5M20 20v-5h-5M4 20h5v-5M20 4h-5v5"></path></svg>`;
+                switchCamBtn.innerHTML = `<svg class="w-5 h-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h5M20 20v-5h-5m-5 5h5v-5M4 9V4h5" /></svg>`;
                 switchCamBtn.onclick = (e) => {
                     e.stopPropagation();
                     switchCamera();
