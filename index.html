@@ -47,12 +47,17 @@
             background-color: #4A4A4A;
             align-self: flex-start;
         }
+        button:disabled {
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body class="flex items-center justify-center h-screen">
 
     <!-- Pantalla de Conexión -->
     <div id="connection-screen" class="text-center p-4">
+        <!-- LOGO AÑADIDO -->
+        <img src="https://placehold.co/150x150/3c4043/E8EAED?text=LOGO" alt="Logo de FantasmaCall" class="mx-auto mb-4 w-24 h-24 rounded-full">
         <h1 class="text-4xl font-bold mb-2">FantasmaCall</h1>
         <p class="text-lg text-gray-300 mb-6">Tu ID para que otros se unan:</p>
         <div class="flex items-center justify-center bg-gray-700 p-2 rounded-lg mb-6 max-w-sm mx-auto">
@@ -148,15 +153,13 @@
             conn.on('data', (data) => handleData(peerId, data));
             conn.on('close', () => removeParticipant(peerId));
             conn.on('open', () => {
-                // Notificar a nuestros otros contactos sobre el nuevo usuario
                 Object.values(dataConnections).forEach(c => {
-                    // Notificamos a otros sobre el nuevo peer
                     if (c.peer !== peerId) {
-                        c.send({ type: 'user-connected', peerId: peerId, name: 'Nuevo Usuario' }); // El nombre se actualizará
+                        c.send({ type: 'user-connected', peerId: peerId, name: 'Nuevo Usuario' });
                     }
-                    // Notificamos al nuevo peer sobre nosotros
-                    conn.send({ type: 'user-connected', peerId: peer.id, name: myName });
+                    conn.send({ type: 'user-connected', peerId: c.peer, name: myName }); // Envía info de los existentes al nuevo
                 });
+                 conn.send({ type: 'user-connected', peerId: peer.id, name: myName });
             });
         };
 
@@ -170,7 +173,6 @@
                         console.log(`Notificado del nuevo usuario ${data.name} (${data.peerId}). Llamando.`);
                         makeCall(data.peerId, data.name);
                     }
-                    // Actualizar nombre si ya existe el video
                     const nameTag = document.querySelector(`#container-${data.peerId} .participant-name`);
                     if (nameTag && nameTag.textContent !== data.name) {
                         nameTag.textContent = data.name;
@@ -180,6 +182,13 @@
         };
 
         const initializePeer = async () => {
+            // ---> FIX: Deshabilitar controles hasta que PeerJS esté listo
+            friendIdInput.disabled = true;
+            callBtn.disabled = true;
+            callBtn.textContent = 'Conectando...';
+            callBtn.classList.add('bg-gray-500', 'hover:bg-gray-500', 'cursor-not-allowed');
+            callBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
+
             try {
                 const requestedName = prompt("Ingresa tu nombre para el chat:", myName);
                 if (requestedName) myName = requestedName;
@@ -192,6 +201,13 @@
                     myIdSpan.textContent = id;
                     const localVideoContainer = document.getElementById('container-local');
                     if (localVideoContainer) localVideoContainer.id = `container-${id}`;
+                    
+                    // ---> FIX: Habilitar controles ahora que PeerJS está listo
+                    friendIdInput.disabled = false;
+                    callBtn.disabled = false;
+                    callBtn.textContent = 'Unirse';
+                    callBtn.classList.remove('bg-gray-500', 'hover:bg-gray-500', 'cursor-not-allowed');
+                    callBtn.classList.add('bg-green-600', 'hover:bg-green-700');
                 });
 
                 peer.on('call', (call) => {
@@ -236,7 +252,6 @@
             showCallScreen();
         };
         
-        // --- Funciones del Chat (CORREGIDAS) ---
         const displayMessage = (fromName, message, isSent) => {
             const messageEl = document.createElement('div');
             messageEl.textContent = message;
@@ -265,7 +280,6 @@
             chatInput.value = '';
         };
 
-        // --- Funciones de UI (CORREGIDAS) ---
         const addVideoStream = (id, name, stream, isMuted = false) => {
             if (document.getElementById(`container-${id}`)) {
                 const nameTag = document.querySelector(`#container-${id} .participant-name`);
@@ -320,7 +334,6 @@
             }
         };
 
-        // --- Event Listeners (CORREGIDOS) ---
         copyIdBtn.addEventListener('click', () => {
             navigator.clipboard.writeText(myIdSpan.textContent).then(() => {
                 alert('¡ID copiado al portapapeles!');
@@ -331,9 +344,11 @@
         chatForm.addEventListener('submit', sendMessage);
         chatBtn.addEventListener('click', () => {
             chatPanel.classList.toggle('hidden');
+            chatPanel.classList.toggle('flex'); // Asegura que se muestre como flex
         });
 
         muteBtn.addEventListener('click', () => {
+            if (!localStream) return;
             isMuted = !isMuted;
             localStream.getAudioTracks()[0].enabled = !isMuted;
             muteBtn.classList.toggle('active', isMuted);
@@ -341,6 +356,7 @@
         });
 
         videoBtn.addEventListener('click', () => {
+            if (!localStream) return;
             isVideoOff = !isVideoOff;
             localStream.getVideoTracks()[0].enabled = !isVideoOff;
             videoBtn.classList.toggle('active', isVideoOff);
