@@ -179,7 +179,7 @@
             conn.on('close', () => removeParticipant(conn.peer));
             conn.on('open', () => {
                 dataConnections[conn.peer] = conn;
-                conn.send({ type: 'user-info', peerId: peer.id, name: myName });
+                conn.send({ type: 'request-peer-list' });
             });
         };
 
@@ -197,12 +197,22 @@
                 case 'user-info':
                     participants[data.peerId] = { name: data.name };
                     updateParticipantName(data.peerId, data.name);
-                    broadcastData({ type: 'new-peer-announcement', peerId: data.peerId }, fromId);
                     break;
-                case 'new-peer-announcement':
-                    if (!calls[data.peerId] && !dataConnections[data.peerId] && data.peerId !== peer.id) {
-                        makeCall(data.peerId);
+                case 'request-peer-list':
+                    const peerList = Object.keys(dataConnections);
+                    if (dataConnections[fromId]) {
+                        dataConnections[fromId].send({ type: 'peer-list', peers: peerList });
+                        dataConnections[fromId].send({ type: 'user-info', peerId: peer.id, name: myName });
                     }
+                    break;
+                case 'peer-list':
+                    data.peers.forEach(peerId => {
+                        if (!dataConnections[peerId] && peerId !== peer.id) {
+                            const conn = peer.connect(peerId, { reliable: true });
+                            setupDataConnection(conn);
+                            makeCall(peerId);
+                        }
+                    });
                     break;
             }
         };
