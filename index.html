@@ -171,15 +171,14 @@
         let videoDevices = [];
         let currentCameraIndex = 0;
 
+
         // --- Lógica de Conexión (PeerJS) ---
         const setupDataConnection = (conn) => {
             conn.on('data', (data) => handleData(conn.peer, data));
             conn.on('close', () => removeParticipant(conn.peer));
             conn.on('open', () => {
                 dataConnections[conn.peer] = conn;
-                // Al conectar, envía nuestra info y pide la lista de todos los demás
                 conn.send({ type: 'user-info', peerId: peer.id, name: myName });
-                conn.send({ type: 'request-peer-list' });
             });
         };
 
@@ -197,21 +196,13 @@
                 case 'user-info':
                     participants[data.peerId] = { name: data.name };
                     updateParticipantName(data.peerId, data.name);
+                    // ---> FIX: Anunciar nuevo usuario a los demás para que se conecten
+                    broadcastData({ type: 'new-peer-announcement', peerId: data.peerId }, fromId);
                     break;
-                // --- FIX: Lógica de conexión grupal mejorada ---
-                case 'request-peer-list':
-                    const peerList = Object.keys(dataConnections);
-                    if (dataConnections[fromId]) {
-                        dataConnections[fromId].send({ type: 'peer-list', peers: peerList });
+                case 'new-peer-announcement':
+                    if (!calls[data.peerId] && data.peerId !== peer.id) {
+                        makeCall(data.peerId);
                     }
-                    break;
-                case 'peer-list':
-                    data.peers.forEach(peerId => {
-                        if (!dataConnections[peerId] && peerId !== peer.id) {
-                            const conn = peer.connect(peerId, { reliable: true });
-                            setupDataConnection(conn);
-                        }
-                    });
                     break;
             }
         };
@@ -243,7 +234,6 @@
                     const localVideoContainer = document.getElementById('container-local');
                     if (localVideoContainer) {
                         localVideoContainer.id = `container-${id}`;
-                        // FIX: Añadir botón de cámara después de tener el ID
                         addCameraSwitchButton(id);
                     }
                     
@@ -254,14 +244,14 @@
                 });
 
                 peer.on('call', (call) => {
-                    const callerId = call.peer;
                     let callerName = 'Alguien';
+                    const callerId = call.peer;
                     
                     const checkCallerInfo = setInterval(() => {
-                        if (participants[callerId]) {
-                            callerName = participants[callerId].name;
+                        if (participants[callerId] && participants[callerId].name) {
+                             callerName = participants[callerId].name;
                         }
-                        callerNameSpan.textContent = callerName;
+                         callerNameSpan.textContent = callerName;
                     }, 200);
 
                     incomingCallModal.classList.remove('hidden');
@@ -321,8 +311,12 @@
             call.on('close', () => removeParticipant(friendId));
         };
         
-        const broadcastData = (data) => {
-             Object.values(dataConnections).forEach(conn => conn.send(data));
+        const broadcastData = (data, excludeId = null) => {
+             Object.values(dataConnections).forEach(conn => {
+                if (conn.peer !== excludeId) {
+                    conn.send(data);
+                }
+             });
         }
 
         const displayMessage = (fromName, message, isSent) => {
@@ -388,8 +382,8 @@
             videoGrid.appendChild(container);
         };
         
-        // --- FIX: Función separada para añadir el botón de cambio de cámara
         const addCameraSwitchButton = (id) => {
+            // FIX: Ahora el botón de cámara se añade correctamente
             if (videoDevices.length > 1) {
                 const container = document.getElementById(`container-${id}`);
                 if(container && !container.querySelector('.switch-camera-btn')) {
@@ -416,6 +410,7 @@
             };
             localStream = await navigator.mediaDevices.getUserMedia(constraints);
 
+            // FIX: Se obtienen los dispositivos ANTES de intentar añadir el botón
             if (!videoDevices.length) {
                 const devices = await navigator.mediaDevices.enumerateDevices();
                 videoDevices = devices.filter(d => d.kind === 'videoinput');
