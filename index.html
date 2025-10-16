@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FantasmaCall</title>
+    <title>FantasmaCall - Llamadas Reales</title>
+    <!-- Incluimos la librería PeerJS -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -13,71 +15,50 @@
             color: #E8EAED;
         }
         .control-button {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            width: 80px;
-            height: 60px;
-            border-radius: 12px;
-            transition: background-color 0.2s ease-in-out;
-            cursor: pointer;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            width: 80px; height: 60px; border-radius: 12px;
+            transition: background-color 0.2s ease-in-out; cursor: pointer;
         }
-        .control-button:hover {
-            background-color: #3c4043;
-        }
-        .control-button.active {
-            background-color: #4A4A4A;
-        }
-         .control-button.end-call {
-            background-color: #EA4335;
-        }
-        .control-button.end-call:hover {
-            background-color: #D93025;
-        }
+        .control-button:hover { background-color: #3c4043; }
+        .control-button.active { background-color: #4A4A4A; }
+        .control-button.end-call { background-color: #EA4335; }
+        .control-button.end-call:hover { background-color: #D93025; }
         .video-container {
-            position: relative;
-            overflow: hidden;
-            border-radius: 12px;
-            background-color: #2D2E30;
+            position: relative; overflow: hidden; border-radius: 12px; background-color: #2D2E30;
         }
-        .video-container video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
+        .video-container video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
         .participant-name {
-            position: absolute;
-            bottom: 8px;
-            left: 8px;
-            background-color: rgba(0, 0, 0, 0.5);
-            color: white;
-            padding: 4px 8px;
-            border-radius: 6px;
-            font-size: 14px;
+            position: absolute; bottom: 8px; left: 8px; background-color: rgba(0, 0, 0, 0.5);
+            color: white; padding: 4px 8px; border-radius: 6px; font-size: 14px;
         }
     </style>
 </head>
 <body class="flex items-center justify-center h-screen">
 
-    <!-- Pantalla de Bienvenida -->
-    <div id="welcome-screen" class="text-center">
-        <h1 class="text-4xl font-bold mb-4">Bienvenido a FantasmaCall</h1>
-        <p class="text-lg text-gray-300 mb-8">Ingresa tu nombre para unirte a la reunión.</p>
+    <!-- Pantalla de Conexión -->
+    <div id="connection-screen" class="text-center p-4">
+        <h1 class="text-4xl font-bold mb-2">FantasmaCall</h1>
+        <p class="text-lg text-gray-300 mb-6">Tu ID para que te llamen:</p>
+        <div class="flex items-center justify-center bg-gray-700 p-2 rounded-lg mb-6 max-w-sm mx-auto">
+            <span id="my-id" class="text-lg font-mono text-green-400">Obteniendo ID...</span>
+            <button id="copy-id-btn" class="ml-4 p-2 rounded-lg bg-blue-600 hover:bg-blue-700 transition" title="Copiar ID">
+                <svg class="w-5 h-5" fill="white" viewBox="0 0 20 20"><path d="M7 3a1 1 0 011-1h5a1 1 0 011 1v2h1.5a1.5 1.5 0 011.5 1.5v9a1.5 1.5 0 01-1.5 1.5h-9A1.5 1.5 0 013 15.5v-9A1.5 1.5 0 014.5 5H6V3a1 1 0 011-1zM6 5v1h8V5h-1v1a1 1 0 01-1 1H8a1 1 0 01-1-1V5H6z"></path></svg>
+            </button>
+        </div>
+
+        <p class="text-lg text-gray-300 mb-4">Ingresa el ID de tu amigo para llamarlo:</p>
         <div class="flex justify-center">
-            <input type="text" id="username" placeholder="Tu nombre..." class="w-64 px-4 py-2 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <button id="join-btn" class="ml-4 px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition">Unirse</button>
+            <input type="text" id="friend-id" placeholder="ID del amigo..." class="w-64 px-4 py-2 rounded-l-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <button id="call-btn" class="px-6 py-2 bg-green-600 text-white font-semibold rounded-r-lg hover:bg-green-700 transition">Llamar</button>
         </div>
     </div>
 
     <!-- Pantalla de la Llamada -->
     <div id="call-screen" class="hidden w-full h-full flex flex-col">
-        <!-- Área de video principal -->
-        <main class="flex-1 p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" id="video-grid">
-            <!-- Los videos de los participantes se agregarán aquí -->
+        <main class="flex-1 p-4 grid grid-cols-1 md:grid-cols-2 gap-4" id="video-grid">
+            <!-- Los videos se agregarán aquí -->
         </main>
         
-        <!-- Barra de Controles -->
         <footer class="w-full bg-black bg-opacity-30 p-4">
             <div class="max-w-4xl mx-auto flex justify-center items-center space-x-4">
                 <div id="mute-btn" class="control-button">
@@ -97,55 +78,146 @@
     </div>
 
     <script>
-        const welcomeScreen = document.getElementById('welcome-screen');
+        const connectionScreen = document.getElementById('connection-screen');
         const callScreen = document.getElementById('call-screen');
-        const joinBtn = document.getElementById('join-btn');
-        const usernameInput = document.getElementById('username');
+        const myIdSpan = document.getElementById('my-id');
+        const copyIdBtn = document.getElementById('copy-id-btn');
+        const friendIdInput = document.getElementById('friend-id');
+        const callBtn = document.getElementById('call-btn');
         const videoGrid = document.getElementById('video-grid');
         const muteBtn = document.getElementById('mute-btn');
         const videoBtn = document.getElementById('video-btn');
         const endCallBtn = document.getElementById('end-call-btn');
+
+        let peer;
         let localStream;
         let isMuted = false;
         let isVideoOff = false;
+        let currentCall;
 
-        const createVideoContainer = (id, name) => {
+        // --- Inicialización y Lógica de PeerJS ---
+
+        const initializePeer = async () => {
+            try {
+                // Pedimos permiso para la cámara/micrófono ANTES de inicializar Peer
+                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                addVideoStream('local', 'Tú', localStream, true); // Añadimos nuestro video a la vista
+
+                // Inicializamos PeerJS. Al no poner configuración, usa el servidor gratuito de PeerJS.
+                peer = new Peer();
+
+                peer.on('open', (id) => {
+                    myIdSpan.textContent = id; // Mostramos nuestro ID cuando nos conectamos
+                });
+
+                // Escuchamos llamadas entrantes
+                peer.on('call', (call) => {
+                    if (window.confirm(`¿Aceptar llamada de ${call.peer}?`)) {
+                        call.answer(localStream); // Respondemos la llamada con nuestro video/audio
+                        
+                        // Cuando recibimos el video de la otra persona
+                        call.on('stream', (remoteStream) => {
+                            addVideoStream(call.peer, `Amigo: ${call.peer.slice(0,6)}`, remoteStream);
+                        });
+
+                        currentCall = call;
+                        showCallScreen();
+                    } else {
+                        console.log("Llamada rechazada.");
+                    }
+                });
+
+                peer.on('error', (err) => {
+                    console.error('Error de PeerJS:', err);
+                    alert('Hubo un error de conexión. Por favor, recarga la página.');
+                });
+
+            } catch (error) {
+                console.error("Error al acceder a la cámara/micrófono:", error);
+                alert("No se pudo acceder a tu cámara y micrófono. Por favor, revisa los permisos.");
+            }
+        };
+
+        const makeCall = () => {
+            const friendId = friendIdInput.value;
+            if (!friendId) {
+                alert("Por favor, ingresa el ID de un amigo.");
+                return;
+            }
+
+            const call = peer.call(friendId, localStream);
+
+            call.on('stream', (remoteStream) => {
+                addVideoStream(call.peer, `Amigo: ${friendId.slice(0,6)}`, remoteStream);
+            });
+            
+            currentCall = call;
+            showCallScreen();
+        };
+        
+        // --- Funciones de UI ---
+
+        const addVideoStream = (id, name, stream, isMuted = false) => {
+            if (document.getElementById(`container-${id}`)) return; // Evitar duplicados
+
             const container = document.createElement('div');
+            container.id = `container-${id}`;
             container.className = 'video-container aspect-video';
+
             const video = document.createElement('video');
+            video.srcObject = stream;
             video.autoplay = true;
             video.playsInline = true;
+            video.muted = isMuted;
             container.appendChild(video);
+
             const nameTag = document.createElement('div');
             nameTag.className = 'participant-name';
             nameTag.textContent = name;
             container.appendChild(nameTag);
-            return { container, video };
+
+            videoGrid.appendChild(container);
+        };
+        
+        const showCallScreen = () => {
+            connectionScreen.classList.add('hidden');
+            callScreen.classList.remove('hidden');
+        };
+        
+        const showConnectionScreen = () => {
+            callScreen.classList.add('hidden');
+            connectionScreen.classList.remove('hidden');
+            videoGrid.innerHTML = '';
+            friendIdInput.value = '';
         };
 
-        joinBtn.addEventListener('click', async () => {
-            if (usernameInput.value.trim() === '') {
-                alert('Por favor, ingresa tu nombre.');
-                return;
+        const endCall = () => {
+            if (currentCall) {
+                currentCall.close();
             }
-            welcomeScreen.classList.add('hidden');
-            callScreen.classList.remove('hidden');
-            try {
-                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-                const { container, video } = createVideoContainer('local', `${usernameInput.value} (Tú)`);
-                video.srcObject = localStream;
-                video.muted = true;
-                videoGrid.appendChild(container);
-            } catch (error) {
-                console.error("Error accessing media devices.", error);
-                alert("No se pudo acceder a tu cámara/micrófono. Revisa los permisos.");
-            }
+            showConnectionScreen();
+            // Re-añadimos nuestro propio video a la vista
+            addVideoStream('local', 'Tú', localStream, true);
+        };
+
+        // --- Event Listeners ---
+
+        copyIdBtn.addEventListener('click', () => {
+            navigator.clipboard.writeText(myIdSpan.textContent).then(() => {
+                alert('¡ID copiado al portapapeles!');
+            });
         });
+
+        callBtn.addEventListener('click', makeCall);
+        endCallBtn.addEventListener('click', endCall);
 
         muteBtn.addEventListener('click', () => {
             isMuted = !isMuted;
             localStream.getAudioTracks()[0].enabled = !isMuted;
             muteBtn.classList.toggle('active', isMuted);
+            muteBtn.innerHTML = isMuted ?
+                `<svg class="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.983 5.983L12 6v6m0 0l-1.414-1.414M12 12L10.586 10.586m1.414 1.414L12 12zM6 18L18 6M6 6l12 12"></path></svg><span class="text-xs mt-1">Reactivar</span>` :
+                `<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path></svg><span class="text-xs mt-1">Silenciar</span>`;
         });
 
         videoBtn.addEventListener('click', () => {
@@ -154,12 +226,9 @@
             videoBtn.classList.toggle('active', isVideoOff);
         });
 
-        endCallBtn.addEventListener('click', () => {
-            localStream.getTracks().forEach(track => track.stop());
-            callScreen.classList.add('hidden');
-            welcomeScreen.classList.remove('hidden');
-            videoGrid.innerHTML = '';
-        });
+        // Iniciar todo
+        initializePeer();
     </script>
 </body>
 </html>
+
