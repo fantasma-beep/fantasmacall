@@ -173,13 +173,13 @@
 
 
         // --- Lógica de Conexión (PeerJS) ---
+        // ---> FIX: Lógica de conexión grupal reconstruida
         const setupDataConnection = (conn) => {
             conn.on('data', (data) => handleData(conn.peer, data));
             conn.on('close', () => removeParticipant(conn.peer));
             conn.on('open', () => {
                 dataConnections[conn.peer] = conn;
                 conn.send({ type: 'user-info', peerId: peer.id, name: myName });
-                broadcastData({ type: 'new-peer-announcement', peerId: conn.peer });
             });
         };
 
@@ -397,14 +397,17 @@
             }
         };
 
-        const setupLocalMedia = async () => {
-            const devices = await navigator.mediaDevices.enumerateDevices();
-            videoDevices = devices.filter(d => d.kind === 'videoinput');
+        const setupLocalMedia = async (deviceId = undefined) => {
             const constraints = {
-                video: true,
+                video: { deviceId: deviceId ? { exact: deviceId } : undefined },
                 audio: true,
             };
             localStream = await navigator.mediaDevices.getUserMedia(constraints);
+
+            if (!videoDevices.length) {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                videoDevices = devices.filter(d => d.kind === 'videoinput');
+            }
         };
 
         // ---> FIX: Lógica de cambio de cámara reconstruida para no perder el audio
