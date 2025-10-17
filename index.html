@@ -175,15 +175,13 @@
         let videoDevices = [];
         let currentCameraIndex = 0;
 
-
         // --- Lógica de Conexión (PeerJS) ---
         const setupDataConnection = (conn) => {
             conn.on('data', (data) => handleData(conn.peer, data));
             conn.on('close', () => removeParticipant(conn.peer));
             conn.on('open', () => {
                 dataConnections[conn.peer] = conn;
-                conn.send({ type: 'user-info', peerId: peer.id, name: myName });
-                broadcastData({ type: 'new-peer-announcement', peerId: conn.peer });
+                conn.send({ type: 'request-peer-list' });
             });
         };
 
@@ -198,15 +196,23 @@
                         chatPanel.classList.add('flex');
                     }
                     break;
+                case 'request-peer-list':
+                    const peerList = Object.keys(participants).filter(id => id !== peer.id && id !== fromId);
+                    if (dataConnections[fromId]) {
+                        dataConnections[fromId].send({ type: 'peer-list', peers: peerList });
+                        dataConnections[fromId].send({ type: 'user-info', peerId: peer.id, name: myName });
+                    }
+                    break;
+                case 'peer-list':
+                    data.peers.forEach(peerId => {
+                        if (!participants[peerId] && peerId !== peer.id) {
+                             makeCall(peerId);
+                        }
+                    });
+                    break;
                 case 'user-info':
                     participants[data.peerId] = { name: data.name };
                     updateParticipantName(data.peerId, data.name);
-                    broadcastData({ type: 'new-peer-announcement', peerId: data.peerId }, fromId);
-                    break;
-                case 'new-peer-announcement':
-                    if (!calls[data.peerId] && !dataConnections[data.peerId] && data.peerId !== peer.id) {
-                        makeCall(data.peerId);
-                    }
                     break;
                  case 'force-mute':
                     if (!isMuted) muteBtn.click();
@@ -223,6 +229,10 @@
                 case 'force-kick':
                     alert('Has sido eliminado de la llamada.');
                     endCall();
+                    break;
+                // --- NUEVO: Manejar desconexión de un participante ---
+                case 'user-disconnected':
+                    removeParticipant(data.peerId);
                     break;
             }
         };
@@ -309,11 +319,9 @@
             call.on('close', () => removeParticipant(friendId));
         };
         
-        const broadcastData = (data, excludeId = null) => {
+        const broadcastData = (data) => {
              Object.values(dataConnections).forEach(conn => {
-                if (conn && conn.open && conn.peer !== excludeId) {
-                    conn.send(data);
-                }
+                if(conn && conn.open) conn.send(data)
              });
         }
 
@@ -454,7 +462,6 @@
             }
         };
 
-        // ---> FIX: Lógica de cambio de cámara reconstruida para no perder el audio
         const switchCamera = async () => {
             if (videoDevices.length < 2) return;
             currentCameraIndex = (currentCameraIndex + 1) % videoDevices.length;
@@ -509,13 +516,17 @@
         };
 
         const endCall = () => {
-            Object.values(calls).forEach(call => call.close());
-            for (const key in calls) delete calls[key];
-            for (const key in dataConnections) delete dataConnections[key];
-            for (const key in participants) {
-                if(key !== peer.id) delete participants[key];
-            }
-            showConnectionScreen();
+            broadcastData({ type: 'user-disconnected', peerId: peer.id });
+
+            setTimeout(() => {
+                Object.values(calls).forEach(call => call.close());
+                for (const key in calls) delete calls[key];
+                for (const key in dataConnections) delete dataConnections[key];
+                for (const key in participants) {
+                    if(key !== peer.id) delete participants[key];
+                }
+                showConnectionScreen();
+            }, 100);
         };
         
         const showCallScreen = () => {
