@@ -230,7 +230,6 @@
                     alert('Has sido eliminado de la llamada.');
                     endCall();
                     break;
-                // --- NUEVO: Manejar desconexión de un participante ---
                 case 'user-disconnected':
                     removeParticipant(data.peerId);
                     break;
