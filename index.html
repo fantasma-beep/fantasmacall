@@ -64,14 +64,12 @@
         .video-overlay-button:hover { transform: scale(1.1); }
         .fullscreen-btn { top: 8px; right: 8px; }
         .switch-camera-btn { top: 8px; left: 8px; }
-
-        /* --- NUEVO: Estilos para controles de anfitrión --- */
         .admin-controls {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            display: none; /* Oculto por defecto */
+            display: none;
             flex-direction: row;
             gap: 16px;
             z-index: 4;
@@ -80,7 +78,7 @@
             border-radius: 99px;
         }
         .video-container:hover .admin-controls {
-            display: flex; /* Visible en hover */
+            display: flex;
         }
         .admin-controls .video-overlay-button{
             position: static;
@@ -145,18 +143,7 @@
             </div>
         </footer>
     </div>
-
-    <div id="incoming-call-modal" class="hidden fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
-        <div class="bg-gray-800 p-8 rounded-2xl text-center shadow-lg">
-            <h2 class="text-2xl font-bold mb-2">Llamada Entrante</h2>
-            <p class="text-lg mb-6"><span id="caller-name" class="font-semibold">Alguien</span> te está llamando.</p>
-            <div class="flex justify-center space-x-4">
-                <button id="decline-call-btn" class="px-8 py-3 bg-red-600 text-white font-bold rounded-full hover:bg-red-700 transition">Rechazar</button>
-                <button id="accept-call-btn" class="px-8 py-3 bg-green-600 text-white font-bold rounded-full hover:bg-green-700 transition">Contestar</button>
-            </div>
-        </div>
-    </div>
-
+    
     <script>
         // --- Referencias a Elementos del DOM ---
         const connectionScreen = document.getElementById('connection-screen');
@@ -175,11 +162,7 @@
         const messagesDiv = document.getElementById('messages');
         const chatForm = document.getElementById('chat-form');
         const chatInput = document.getElementById('chat-input');
-        const incomingCallModal = document.getElementById('incoming-call-modal');
-        const callerNameSpan = document.getElementById('caller-name');
-        const acceptCallBtn = document.getElementById('accept-call-btn');
-        const declineCallBtn = document.getElementById('decline-call-btn');
-
+        
         // --- Estado de la Aplicación ---
         let peer;
         let localStream;
@@ -199,7 +182,8 @@
             conn.on('close', () => removeParticipant(conn.peer));
             conn.on('open', () => {
                 dataConnections[conn.peer] = conn;
-                conn.send({ type: 'request-peer-list' });
+                conn.send({ type: 'user-info', peerId: peer.id, name: myName });
+                broadcastData({ type: 'new-peer-announcement', peerId: conn.peer });
             });
         };
 
@@ -214,28 +198,26 @@
                         chatPanel.classList.add('flex');
                     }
                     break;
-                case 'request-peer-list':
-                    const peerList = Object.keys(participants).filter(id => id !== peer.id);
-                    if (dataConnections[fromId]) {
-                        dataConnections[fromId].send({ type: 'peer-list', peers: peerList });
-                        dataConnections[fromId].send({ type: 'user-info', peerId: peer.id, name: myName });
-                    }
-                    break;
-                case 'peer-list':
-                    data.peers.forEach(peerId => {
-                        if (!participants[peerId] && peerId !== peer.id) {
-                             makeCall(peerId);
-                        }
-                    });
-                    break;
                 case 'user-info':
                     participants[data.peerId] = { name: data.name };
                     updateParticipantName(data.peerId, data.name);
+                    broadcastData({ type: 'new-peer-announcement', peerId: data.peerId }, fromId);
                     break;
-                case 'force-mute':
+                case 'new-peer-announcement':
+                    if (!calls[data.peerId] && !dataConnections[data.peerId] && data.peerId !== peer.id) {
+                        makeCall(data.peerId);
+                    }
+                    break;
+                 case 'force-mute':
                     if (!isMuted) muteBtn.click();
                     break;
+                case 'request-unmute':
+                    if (confirm(`${participants[fromId]?.name || 'El anfitrión'} te pide que reactives tu micrófono. ¿Aceptar?`)) {
+                        if (isMuted) muteBtn.click();
+                    }
+                    break;
                 case 'mute-update':
+                    if (participants[data.peerId]) participants[data.peerId].isMuted = data.isMuted;
                     updateRemoteMuteIcon(data.peerId, data.isMuted);
                     break;
                 case 'force-kick':
@@ -267,7 +249,7 @@
 
                 peer.on('open', (id) => {
                     myIdSpan.textContent = id;
-                    participants[id] = { name: myName };
+                    participants[id] = { name: myName, isMuted: false };
                     const localVideoContainer = document.getElementById('container-local');
                     if (localVideoContainer) {
                         localVideoContainer.id = `container-${id}`;
@@ -281,29 +263,8 @@
                 });
 
                 peer.on('call', (call) => {
-                    let callerName = 'Alguien';
-                    const callerId = call.peer;
-                    
-                    const checkCallerInfo = setInterval(() => {
-                        if (participants[callerId] && participants[callerId].name) {
-                             callerName = participants[callerId].name;
-                        }
-                         callerNameSpan.textContent = callerName;
-                    }, 200);
-
-                    incomingCallModal.classList.remove('hidden');
-
-                    acceptCallBtn.onclick = () => {
-                        clearInterval(checkCallerInfo);
-                        incomingCallModal.classList.add('hidden');
-                        showCallScreen();
-                        answerCall(call);
-                    };
-
-                    declineCallBtn.onclick = () => {
-                        clearInterval(checkCallerInfo);
-                        incomingCallModal.classList.add('hidden');
-                    };
+                    showCallScreen();
+                    answerCall(call);
                 });
 
                 peer.on('connection', (conn) => setupDataConnection(conn));
@@ -416,18 +377,25 @@
             };
             container.appendChild(fullscreenBtn);
 
-            if (id !== 'local' && id !== (peer ? peer.id : '')) {
+             if (id !== 'local' && id !== (peer ? peer.id : '')) {
                 const adminControls = document.createElement('div');
                 adminControls.className = 'admin-controls';
 
                 const remoteMuteBtn = document.createElement('div');
                 remoteMuteBtn.id = `mute-btn-${id}`;
                 remoteMuteBtn.className = 'video-overlay-button';
-                remoteMuteBtn.title = 'Silenciar participante';
+                remoteMuteBtn.title = 'Silenciar/Reactivar participante';
                 remoteMuteBtn.innerHTML = `<svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v1a7 7 0 0 1-14 0v-1"></path><line x1="8" y1="23" x2="16" y2="23"></line></svg>`;
                 remoteMuteBtn.onclick = (e) => {
                     e.stopPropagation();
-                    if (dataConnections[id]) dataConnections[id].send({ type: 'force-mute' });
+                    const targetIsMuted = participants[id]?.isMuted;
+                    if (dataConnections[id]) {
+                        if (targetIsMuted) {
+                            dataConnections[id].send({ type: 'request-unmute' });
+                        } else {
+                            dataConnections[id].send({ type: 'force-mute' });
+                        }
+                    }
                 };
                 adminControls.appendChild(remoteMuteBtn);
 
@@ -474,7 +442,7 @@
         };
 
         const setupLocalMedia = async (deviceId = undefined) => {
-            const constraints = {
+             const constraints = {
                 video: { deviceId: deviceId ? { exact: deviceId } : undefined },
                 audio: true,
             };
@@ -486,6 +454,7 @@
             }
         };
 
+        // ---> FIX: Lógica de cambio de cámara reconstruida para no perder el audio
         const switchCamera = async () => {
             if (videoDevices.length < 2) return;
             currentCameraIndex = (currentCameraIndex + 1) % videoDevices.length;
