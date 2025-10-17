@@ -412,7 +412,8 @@
                 kickBtn.innerHTML = `<svg class="w-5 h-5 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>`;
                 kickBtn.onclick = (e) => {
                     e.stopPropagation();
-                    if (dataConnections[id]) dataConnections[id].send({ type: 'force-kick' });
+                    broadcastData({ type: 'user-disconnected', peerId: id });
+                    removeParticipant(id);
                 };
                 adminControls.appendChild(kickBtn);
                 container.appendChild(adminControls);
@@ -509,8 +510,14 @@
         const removeParticipant = (peerId) => {
             const container = document.getElementById(`container-${peerId}`);
             if (container) container.remove();
-            if (calls[peerId]) delete calls[peerId];
-            if (dataConnections[peerId]) delete dataConnections[peerId];
+            if (calls[peerId]) {
+                calls[peerId].close();
+                delete calls[peerId];
+            }
+            if (dataConnections[peerId]) {
+                dataConnections[peerId].close();
+                delete dataConnections[peerId];
+            }
             if (participants[peerId]) delete participants[peerId];
         };
 
@@ -518,13 +525,7 @@
             broadcastData({ type: 'user-disconnected', peerId: peer.id });
 
             setTimeout(() => {
-                Object.values(calls).forEach(call => call.close());
-                for (const key in calls) delete calls[key];
-                for (const key in dataConnections) delete dataConnections[key];
-                for (const key in participants) {
-                    if(key !== peer.id) delete participants[key];
-                }
-                showConnectionScreen();
+                window.location.reload();
             }, 100);
         };
         
